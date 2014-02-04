@@ -1,0 +1,156 @@
+對於一個沒有（系統性的）學過C++的人來說，學Qt的確比較費勁。中途要不斷理解各種物件導向(面向對象)的概念、熟悉C++的語法。不過我感覺這樣挺好的。QtCreator挺方便，但不想用IDE，太臃腫。編輯器emacs，pro檔案手動寫，就是國際化用自動工具linguist。順便吐槽下：linguist不管zh_CN還是zh_TW都顯示「中文」，只能根據字母順序先後來判斷……
+
+<!--more-->
+&nbsp;
+
+我這個 Hello world 程式比一般的容量大的多：一個MainWindow，中心部件裡套個VBoxLayout，這裡面只有一個label，這個label的內容是HTML，顯示 「Hello world」 和兩個連結，一個是彈出一個Messagebox顯示當前locale，另一個是退出：
+
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-1.png"><img class="alignnone size-full wp-image-125" alt="qt-1-1" src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-1.png" width="185" height="149" /></a>
+
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-2.png"><img class="alignnone size-full wp-image-124" alt="qt-1-2" src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-2.png" width="279" height="155" /></a>
+
+為啥有這個「查看語言環境」呢？那是在國際化的時候，突發奇想加上去的。個人比較喜歡把開頭弄得容量大些，就光一個 「Hello world」 真心木啥意思。
+
+&nbsp;
+
+國際化：
+
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-5.png"><img alt="qt-1-5" src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-5.png" width="183" height="153" /></a>
+
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-3.png"><img class="alignnone  wp-image-123" alt="qt-1-3" src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-3.png" width="189" height="153" /></a>
+
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-4.png"><img class="alignnone size-full wp-image-122" alt="qt-1-4" src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-1-4.png" width="248" height="158" /></a>
+
+&nbsp;
+
+廢話不多說，發代碼。本例所有代碼皆存於此：<a href="https://github.com/910JQK/MyQt/tree/master/Hello" target="_blank">Github</a>
+
+[cpp]
+//檔案：main.cpp
+#include <QtGui/QApplication>
+#include <QtCore>
+#include <QLocale>
+#include <QLibraryInfo>
+#include "hello.h"
+
+int main(int argc, char *argv[]){
+  //創建QApplication
+  QApplication a(argc,argv);
+
+  //取得系統語言環境
+  QString localeName = QLocale::system().name();
+
+  //程式翻譯
+  QTranslator appT;
+  appT.load("hello_"+localeName, "locale" );
+  a.installTranslator(&appT);
+
+  //Qt翻譯
+  QTranslator sysT;
+  sysT.load("qt_"+localeName,QLibraryInfo::location(QLibraryInfo::TranslationsPath));
+  a.installTranslator(&sysT);
+
+  //創建MainWindow
+  MainWindow W;
+
+  //綁定退出信號
+  QObject::connect(&W, SIGNAL(ExitSignal()), &a, SLOT(quit()) );
+
+  //顯示
+  W.show();
+
+  //進入迴圈
+  return a.exec();
+}
+[/cpp]
+先看主函式。
+首先注意一下已經include了hello.h，那裡面有一個繼承自QMainWindow的類，它的例項(實例)就是程式的主窗口。
+開始就創建一個QApplication物件a，把main的兩個參數傳進它的建構函式(構造函數)。QApplication故名思義，就是Qt應用程式的類，總管整個程式相關的事物。至於什麼是建構函式，就是物件被new的時候用來初始化的函式。
+接著是獲得系統的語言環境(locale)，例如"zh-TW"，用作國際化。
+然後是載入程式自身的翻譯和Qt的翻譯。為啥分兩塊呢？因為Qt已經直接弄好的東西，例如各種對話框，都早已經翻譯好了，翻譯文件放在Qt自家的目錄，比如第二張圖的QMessagebox，載入翻譯之後那按鈕上就不是「OK」而是「確定」了；而程式自身需要開發者自己翻譯，所以這就分開了。載入的具體方法是聲明一個QTranslator，然後把相應的翻譯檔案載入進去(之前拿到的locale派上用場了)，擴展名(副檔名)「.qm」可以省掉。再把這貨敲進QApplication裡頭。使用其load方法載入檔案時，注意後一個參數是目錄，檔名就是檔名，目錄要寫到後頭，不能和檔名寫到一塊，例如「locale/hello」這樣。
+那麼這翻譯檔案是怎麼來的呢？
+# 首先生成用作編輯而程式不載入的ts翻譯檔案，他們是XML檔，裡面紀錄了需要翻譯的內容：
+$ lupdate xxx.pro
+# 然後用Qt自帶的linguist工具(GUI)逐個翻譯需要翻譯的內容，翻譯完了的檔案就變成了原文翻譯的對照(ts檔案的名稱列表在.pro裡)：
+$ linguist *.ts
+# 翻譯完保存，全部匯出，也就是編譯出程式用的qm檔案。當然也可以手動編譯：
+$ lrelease *.ts
+那lupdate是咋知道哪些東西需要翻譯的呢？跟gettext類似，被tr()函式包起來的字符串會被加進翻譯列表。這貨全稱是QObject::tr()，這使它只有在含有Q_OBJECT宏的類的成員函式裡頭才可以直接用。
+創建MainWindow，並顯示它，然後就進入GUI的事件迴圈了。這中間有個重要的connect函式，這是Qt獨有的信號槽機制的玩意。啥是信號槽？就是特殊函式信號「signal」和槽「slot」。Qt擴展了C++語言，搞出了這個東西。運行機制是，若滿足觸發條件，信號就像喇叭一樣廣播發出資訊，其所連結到槽(們)收到了就會被觸發執行。信號函式可以把需要的資訊通過參數傳遞給槽。同理信號可以連結信號，槽可以連結槽；一個信號可以連結多個槽，多個信號也可以只連結一個槽。這句<code>QObject::connect(&W, SIGNAL(ExitSignal()), &a, SLOT(quit()) );</code>的意思就是，當W對象(MainWindow)發出ExitSignal這個信號時，a程式退出。這只是一部分，在hello.cpp裡還有一個帶參數傳遞的連結和他完成了整個鏈，到時候再整個說。注意connect()這貨跟tr()一個德行，在外面要用全稱調用。
+P.S. 早就有人吐嘈過「構造函數」這個翻譯了 —— 怎麼想都是「construct a function」，這個「構造」太像動詞了。
+
+[cpp]
+//檔案：hello.h
+#include <QMainWindow>
+#include <QLabel>
+
+class MainWindow : public QMainWindow
+{
+  Q_OBJECT
+public:
+  MainWindow(QWidget *parent = 0);
+  ~MainWindow();
+signals:
+  void ExitSignal();
+public slots:
+  void LinkClicked(QString href);
+private:
+  QLabel *label;
+};
+[/cpp]
+頭文件裡是MainWindow類(繼承自QMainWindow)的聲明，注意Q_OBJECT宏的作用。與類同名函式的就是建構函式，加一「~」的叫解構子(析構函數)，跟建構函式反過來，是物件解體的時候執行的。定義了一個信號和一個槽，還有一個QLabel。注意信號不用再在cpp文件裡寫函式主體了，因為不需要函式主體，這貨只起傳遞作用。
+[cpp]
+//檔案：hello.cpp
+#include <QDesktopWidget>
+#include <QApplication>
+#include <QVBoxLayout>
+#include <QLocale>
+#include <QMessageBox>
+#include "hello.h"
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent){
+  //創建標籤，綁定信號
+  label = new QLabel(tr("<h2><font color='red'>Hello</font> world!</h2><br /><a href='locale_msg'>View Locale</a>&nbsp;&nbsp;<a href='quit'>Quit</a>"));
+  connect(label, SIGNAL(linkActivated(const QString &)), this, SLOT(LinkClicked(const QString &)) );
+
+  //佈局處理
+  QVBoxLayout *vLay = new QVBoxLayout;
+  vLay -> addWidget(label);
+  QWidget *cw = new QWidget;
+  cw -> setLayout(vLay);
+  setCentralWidget(cw);
+
+  //大小位置
+  setFixedSize(sizeHint());
+  QDesktopWidget *desktop = QApplication::desktop();
+  move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
+  setWindowTitle(tr("Hello world!"));
+}
+
+MainWindow::~MainWindow(){
+
+}
+
+void MainWindow::LinkClicked(QString href){
+  if (href == "locale_msg"){
+    //消息框：本地語言環境
+    QMessageBox msgBox(QMessageBox::Information, QLocale::system().name(), "");
+    msgBox.setText(QString(tr("Your locale:")) + QLocale::system().name() );
+    msgBox.exec();
+  }else{
+    //向外發送退出信號
+    this -> ExitSignal();
+  }
+}
+[/cpp]
+Qt的類名和頭文件名是一致的，這挺好的，按需分配。
+建構函數裡首先是創建那個標籤，然後給它綁上信號。標籤的text支持HTML，而且還可以用連結來充當按鈕 —— 看這connent：
+<pre>connect(label, SIGNAL(linkActivated(const QString &)), this, SLOT(LinkClicked(const QString &)) );</pre>
+QLabel自帶了個linkActivated信號，當有連結被點擊時触發。有個參數，那是HTML的a標籤的href屬性，也就是連接到的URL。這個參數會被傳到LinkClicked這個槽做進一步處理(URL要是是"locale_msg"就發消息框告訴你locale是啥，否則向外發(触發自己的)ExitSignal信號。這時，和它綁在一起的a.quit()槽被触發，程式退出。
+<pre>
+label.linkActivated(QString) ==> MainWindow.LinkClicked(QString) ==> QString:"locale_msg"? QMessagebox || ==> W.ExitSignal ==> a.quit()
+</pre>
+再就是佈局，Qt提供了一套layouts來佈局(盛放weights)，有橫向的、縱向的，可以被放進視窗。不過QMainWindow有自己的一套layout(包擴選單欄啥的)，只是直接給了dockweights(可動)和一個中心weight的空間。只有一個weight倒可以直接塞，但在這先假設有多個，都放在vLay這個layout裡頭。然後新建一個weight，用它佈局，再把MainWindow的中心weight調成它，這就大功告成了。
+大小位置，視窗標題沒啥可說的。就是一個sizeHint()返回Qt給的合適大小，也就是默認大小。
+
+【鑑於作者水平問題，不對本文正確性做出擔保】
