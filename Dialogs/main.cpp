@@ -7,7 +7,7 @@ int main(int argc, char *argv[]){
   QApplication a(argc,argv);
 
   QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF-8"));
-  TR appTR(&a,"dialogs");
+  TR appTR(&a,"dialogs_");
 
   MainWindow W;
   QObject::connect(&W, SIGNAL(ExitSignal()), &a, SLOT(quit()) );

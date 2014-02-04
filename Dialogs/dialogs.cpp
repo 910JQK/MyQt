@@ -40,7 +40,7 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
   LC_Group -> addAction(LC_zh_CN_Action);
   LC_Group -> addAction(LC_zh_TW_Action);
   LC_Group -> setExclusive(true);
-  connect(LC_Group, SIGNAL(triggered()), this, SLOT(LC_Changed()) );
+  connect(LC_Group, SIGNAL(triggered(QAction *)), this, SLOT(LC_Changed()) );
 
   //Menus
   QMenu *menu1 = menuBar() -> addMenu(tr("&Menu"));

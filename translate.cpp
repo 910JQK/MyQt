@@ -2,7 +2,6 @@
 #include <QtCore>
 #include <QLocale>
 #include <QLibraryInfo>
-#include "translate.h"
 
 
 TR::TR(QApplication *APP, QString PFNAME){
@@ -13,10 +12,12 @@ TR::TR(QApplication *APP, QString PFNAME){
   QString localeName = QLocale::system().name();
 
   //程式翻譯
+  appT = new QTranslator;
   appT -> load(PreFileName+localeName, "locale" );
   app -> installTranslator(appT);
 
   //Qt翻譯
+  sysT = new QTranslator;
   sysT -> load("qt_"+localeName,QLibraryInfo::location(QLibraryInfo::TranslationsPath));
   app -> installTranslator(sysT);
 }
