@@ -13,6 +13,8 @@ public:
   QTranslator *appT;
   QTranslator *sysT;
   QString PreFileName;
+signals:
+  void UpdateUI();
 public slots:
   void ChangeLocale(QString CurrentLocale);
 };

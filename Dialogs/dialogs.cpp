@@ -43,11 +43,13 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
   connect(LC_Group, SIGNAL(triggered(QAction *)), this, SLOT(LC_Changed()) );
 
   //Menus
-  QMenu *menu1 = menuBar() -> addMenu(tr("&Menu"));
+  menu1 = new QMenu();
+  menu1 = menuBar() -> addMenu(tr("&Menu"));
   menu1 -> addAction(FontDialogAction);
   menu1 -> addAction(ColorDialogAction);
   menu1 -> addAction(ExitAction);
-  QMenu *menu2 = menuBar() -> addMenu(tr("&Locale"));
+  menu2 = new QMenu();
+  menu2 = menuBar() -> addMenu(tr("&Locale"));
   menu2 -> addAction(LC_en_US_Action);
   menu2 -> addAction(LC_ja_JP_Action);
   menu2 -> addAction(LC_zh_CN_Action);
@@ -91,4 +93,14 @@ void MainWindow::setColor(){
   if(color.isValid()){
     textedit -> setTextColor(color);
   }
+}
+
+
+void MainWindow::reTranslate(){
+  textedit -> setText(tr("Input text here"));
+  menu1 -> setTitle(tr("&Menu"));
+  menu2 -> setTitle(tr("&Locale"));
+  FontDialogAction -> setText(tr("Choose &Font..."));
+  ColorDialogAction -> setText(tr("Choose &Color..."));
+  ExitAction -> setText(tr("&Quit..."));
 }

@@ -1,5 +1,6 @@
 #include <QMainWindow>
 
+class QMenu;
 class QTextEdit;
 class QAction;
 class QActionGroup;
@@ -14,6 +15,8 @@ signals:
   void LC_Change_Signal(QString whatlocale);
   void ExitSignal();
 private:
+  QMenu *menu1;
+  QMenu *menu2;
   QTextEdit *textedit;
   QAction *FontDialogAction;
   QAction *ColorDialogAction;
@@ -27,4 +30,5 @@ private slots:
   void LC_Changed();
   void setFont();
   void setColor();
+  void reTranslate();
 };

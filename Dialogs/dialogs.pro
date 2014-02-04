@@ -10,6 +10,6 @@ dialogs.cpp \
 HEADERS += dialogs.h \
 ../translate.h
 
-TRANSLATIONS += dialogs_zh_TW.ts \
-dialogs_zh_CN.ts \
-dialogs_ja_JP.ts
+TRANSLATIONS += ts/dialogs_zh_TW.ts \
+ts/dialogs_zh_CN.ts \
+ts/dialogs_ja_JP.ts
