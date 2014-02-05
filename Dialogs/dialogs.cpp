@@ -1,11 +1,15 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QTextEdit>
+#include <QIcon>
 #include <QAction>
 #include <QActionGroup>
 #include <QMenuBar>
 #include <QMenu>
-#include <QToolBar>
+#include <QStatusBar>
+#include <QLabel>
+#include <QTimer>
+#include <QDateTime>
 #include <QKeySequence>
 #include <QFontDialog>
 #include <QColorDialog>
@@ -18,12 +22,22 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
   textedit = new QTextEdit(tr("Input text here"),this);
   setCentralWidget(textedit);
 
+  //StatusBar
+  msglabel = new QLabel();
+  statusBar() -> addWidget(msglabel);
+  statusBar() -> setStyleSheet("QStatusBar::item{border:0px;}");
+  QTimer *Timer = new QTimer(this);
+  connect(Timer, SIGNAL(timeout()), this, SLOT(Ticker()) );
+  Timer -> start(1000);
+
   //Actions
   FontDialogAction = new QAction(tr("Choose &Font..."),this);
   connect(FontDialogAction, SIGNAL(triggered()), this, SLOT(setFont()) );
   ColorDialogAction = new QAction(tr("Choose &Color..."),this);
   connect(ColorDialogAction, SIGNAL(triggered()), this, SLOT(setColor()) );
   ExitAction = new QAction(tr("&Quit..."),this);
+  ExitAction -> setShortcut(QKeySequence::Quit);
+  ExitAction -> setIcon(QIcon::fromTheme("application-exit"));
   connect(ExitAction, SIGNAL(triggered()), this, SIGNAL(ExitSignal()) );
   //--
   LC_en_US_Action = new QAction("&English",this);
@@ -56,7 +70,7 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
   menu2 -> addAction(LC_zh_TW_Action);
 
   //Size and Position
-  setFixedSize(sizeHint());
+  setFixedSize(360,270);
   QDesktopWidget *desktop = QApplication::desktop();
   move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
 }
@@ -64,18 +78,6 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow(){
 
-}
-
-
-void MainWindow::LC_Changed(){
-  if(LC_en_US_Action -> isChecked())
-    LC_Change_Signal("en_US");
-  else if(LC_ja_JP_Action -> isChecked())
-    LC_Change_Signal("ja_JP");
-  else if(LC_zh_CN_Action -> isChecked())
-    LC_Change_Signal("zh_CN");
-  else if(LC_zh_TW_Action -> isChecked())
-    LC_Change_Signal("zh_TW");
 }
 
 
@@ -95,6 +97,28 @@ void MainWindow::setColor(){
   }
 }
 
+void MainWindow::LC_init(QString init_lc){
+  if(init_lc == "en_US")
+    LC_en_US_Action -> setChecked(true);
+  else if(init_lc == "ja_JP")
+    LC_ja_JP_Action -> setChecked(true);
+  else if(init_lc == "zh_CN")
+    LC_zh_CN_Action -> setChecked(true);
+  else if(init_lc == "zh_TW")
+    LC_zh_TW_Action -> setChecked(true);
+}
+
+void MainWindow::LC_Changed(){
+  if(LC_en_US_Action -> isChecked())
+    LC_Change_Signal("en_US");
+  else if(LC_ja_JP_Action -> isChecked())
+    LC_Change_Signal("ja_JP");
+  else if(LC_zh_CN_Action -> isChecked())
+    LC_Change_Signal("zh_CN");
+  else if(LC_zh_TW_Action -> isChecked())
+    LC_Change_Signal("zh_TW");
+}
+
 
 void MainWindow::reTranslate(){
   textedit -> setText(tr("Input text here"));
@@ -103,4 +127,9 @@ void MainWindow::reTranslate(){
   FontDialogAction -> setText(tr("Choose &Font..."));
   ColorDialogAction -> setText(tr("Choose &Color..."));
   ExitAction -> setText(tr("&Quit..."));
+}
+
+
+void MainWindow::Ticker(){
+  msglabel -> setText( QDateTime::currentDateTime().toString(tr("Now: dd/MM/yyyy hh:mm:ss")) );
 }

@@ -5,16 +5,17 @@
 #include "translate.h"
 
 
-TR::TR(QApplication *APP, QString PFNAME){
+TR::TR(QApplication *APP, QString PFNAME, QString TFDIR){
   app = APP;
   PreFileName = PFNAME;
+  TFileDir = TFDIR;
 
   //取得系統語言環境
-  QString localeName = QLocale::system().name();
+  localeName = QLocale::system().name();
 
   //程式翻譯
   appT = new QTranslator;
-  appT -> load(PreFileName+localeName, "locale" );
+  appT -> load(PreFileName+localeName, TFileDir );
   app -> installTranslator(appT);
 
   //Qt翻譯
@@ -35,7 +36,7 @@ void TR::ChangeLocale(QString CurrentLocale){
   app -> removeTranslator(sysT);
 
   //程式重新翻譯
-  appT -> load(PreFileName+CurrentLocale, "locale" );
+  appT -> load(PreFileName+CurrentLocale, TFileDir );
   app -> installTranslator(appT);
 
   //Qt重新翻譯
