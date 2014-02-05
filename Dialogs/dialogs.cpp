@@ -36,8 +36,8 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
   ColorDialogAction = new QAction(tr("Choose &Color..."),this);
   connect(ColorDialogAction, SIGNAL(triggered()), this, SLOT(setColor()) );
   ExitAction = new QAction(tr("&Quit..."),this);
-  ExitAction -> setShortcut(QKeySequence::Quit);
-  ExitAction -> setIcon(QIcon::fromTheme("application-exit"));
+  ExitAction -> setShortcut(QKeySequence("Ctrl+Q"));
+  ExitAction -> setIcon(QIcon::fromTheme("window-close"));
   connect(ExitAction, SIGNAL(triggered()), this, SIGNAL(ExitSignal()) );
   //--
   LC_en_US_Action = new QAction("&English",this);
