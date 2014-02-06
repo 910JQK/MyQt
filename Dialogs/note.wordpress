@@ -1,0 +1,326 @@
+這次比較亂，因為是想到啥加啥……一個MainWindow，有一個Textedit，一條狀態欄顯示時間，一條選單欄(列)：第一個選單「選單」裡有項「選擇字體」、「選擇文字顏色」和「退出」，「退出」有快捷鍵「Ctrl+Q」；第二個選單「語言環境」用於動態語言切換。
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-2-1.png"><img src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-2-1.png" alt="qt-2-1" width="380" height="311" class="alignnone size-full wp-image-142" /></a>
+
+<!--more-->
+
+GIF動圖：
+<a href="http://poker-lee.tk/wp-content/uploads/2014/02/qt-2-2.gif"><img src="http://poker-lee.tk/wp-content/uploads/2014/02/qt-2-2.gif" alt="qt-2-2" width="380" height="300" class="alignnone size-full wp-image-141" /></a>
+
+完整代碼：<a href="https://github.com/910JQK/MyQt/tree/master/Dialogs" title="Github" target="_blank"></a>
+
+為了方便，我寫了各TR類來處理翻譯問題 —— 根據當前系統語言環境載入翻譯文件，並提供動態切換功能：
+[cpp]
+//檔案：../translate.h
+#include <QObject>
+class QApplication;
+class QTranslator;
+class QString;
+
+class TR : public QObject
+{
+  Q_OBJECT
+public:
+  TR(QApplication *APP, QString PFNAME, QString TFDIR);
+  ~TR();
+  QApplication *app;
+  QTranslator *appT;
+  QTranslator *sysT;
+  QString PreFileName;
+  QString TFileDir;
+  QString localeName;
+signals:
+  void UpdateUI();
+public slots:
+  void ChangeLocale(QString CurrentLocale);
+};
+[/cpp]
+建構函式有三個參數，分別讀入需要翻譯的QApplication、翻譯檔案名(locale之前的哪一塊)、翻譯檔案所在目錄。會被分別存進*app、PreFileName、TFileDir這幾個成員。
+兩個QTranlator一個是應用程式的，一個是Qt的，這個上次說過不廢話了。
+槽ChangeLocale用來改變當前語言環境，重新載入Tranlator，然後發送UpdateUI信號，讓程式重新tr()一遍所有的字串。下面是cpp檔：
+[cpp]
+//檔案：../translate.cpp
+#include <QtGui/QApplication>
+#include <QtCore>
+#include <QLocale>
+#include <QLibraryInfo>
+#include "translate.h"
+
+
+TR::TR(QApplication *APP, QString PFNAME, QString TFDIR){
+  app = APP;
+  PreFileName = PFNAME;
+  TFileDir = TFDIR;
+
+  //取得系統語言環境
+  localeName = QLocale::system().name();
+
+  //程式翻譯
+  appT = new QTranslator;
+  appT -> load(PreFileName+localeName, TFileDir );
+  app -> installTranslator(appT);
+
+  //Qt翻譯
+  sysT = new QTranslator;
+  sysT -> load("qt_"+localeName,QLibraryInfo::location(QLibraryInfo::TranslationsPath));
+  app -> installTranslator(sysT);
+}
+
+
+TR::~TR(){
+
+}
+
+
+void TR::ChangeLocale(QString CurrentLocale){
+  //卸下原來的Translator
+  app -> removeTranslator(appT);
+  app -> removeTranslator(sysT);
+
+  //程式重新翻譯
+  appT -> load(PreFileName+CurrentLocale, TFileDir );
+  app -> installTranslator(appT);
+
+  //Qt重新翻譯
+  sysT -> load("qt_"+CurrentLocale,QLibraryInfo::location(QLibraryInfo::TranslationsPath));
+  app -> installTranslator(sysT);
+
+  //發送重翻譯信號
+  UpdateUI();
+}
+[/cpp]
+
+正題開始。首先是頭文件：
+[cpp]
+//檔案：dialogs.h
+#include <QMainWindow>
+
+class QString;
+class QMenu;
+class QTextEdit;
+class QLabel;
+class QAction;
+class QActionGroup;
+
+class MainWindow : public QMainWindow
+{
+  Q_OBJECT
+public:
+  MainWindow(QWidget *parent = 0);
+  ~MainWindow();
+  void LC_init(QString init_lc);
+signals:
+  void LC_Change_Signal(QString whatlocale);
+  void ExitSignal();
+private:
+  QMenu *menu1;
+  QMenu *menu2;
+  QLabel *msglabel;
+  QTextEdit *textedit;
+  QAction *FontDialogAction;
+  QAction *ColorDialogAction;
+  QAction *ExitAction;
+  QAction *LC_en_US_Action;
+  QAction *LC_ja_JP_Action;
+  QAction *LC_zh_CN_Action;
+  QAction *LC_zh_TW_Action;
+  QActionGroup *LC_Group;
+private slots:
+  void setFont();
+  void setColor();
+  void Ticker();
+  void LC_Changed();
+  void reTranslate();
+};
+[/cpp]
+1：為啥有個msglabel？
+—— 因為Qt的狀態欄可以容納多個Widget.
+2：為啥有個LC_Group？
+—— 使用這貨是為了讓語言選擇的選單是單選的，一旦這個組被設定為單選，在這個Group裡的所有Action就只能check一個了。
+3：QAction到底是啥？
+—— 這貨很神奇，把它加到選單裡就是選單項，加到工具條裡就是按鈕。
+4：既然如此，為啥不寫個工具條呢？
+—— 正因為如此，還有演示工具條的必要麽……
+5：LC_init這貨是幹啥的？
+—— 後面再說囉~
+
+主函式：
+[cpp]
+//檔案：main.cpp
+#include <QtGui/QApplication>
+#include <QTextCodec>
+#include "../translate.h"
+#include "dialogs.h"
+
+int main(int argc, char *argv[]){
+  QApplication a(argc,argv);
+
+  QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF-8"));
+  TR appTR(&a,"dialogs_","locale");
+
+  MainWindow W;
+  W.LC_init(appTR.localeName);
+  QObject::connect(&W, SIGNAL(ExitSignal()), &a, SLOT(quit()) );
+  QObject::connect(&W, SIGNAL(LC_Change_Signal(const QString &)), &appTR, SLOT(ChangeLocale(const QString &)) );
+  QObject::connect(&appTR, SIGNAL(UpdateUI()), &W, SLOT(reTranslate()) );
+
+  W.show();
+
+  return a.exec();
+}
+[/cpp]
+那個「setCodecForCStrings」是指定編碼用的。要不然不翻譯的非ASCII字符會顯示不正常。因為語言的選項本身就是不翻譯的，如「简体中文」，所以這塊得加上。
+後面創建TR物件來翻譯程式。第二個參數是「"dialog_"」，第三個是「"locale"」，假如當前語系是「zh_TW」的話，就會去找「locale/dialog_zh_TW.qm」做翻譯文件。
+「W.LC_init(appTR.localeName)」這是啥？因為剛開始MainWindow裡的語言選單項默認都是空的，沒有一個顯示被選(checked)，TR翻譯完需要把當前語系告訴MainWindow，好讓它給相應的選項設定checked，看着正常一點。
+三個connect，第一個是退出信號，MainWindow往外傳用來退出程式的。其實也可以連MainWindow上某個Widget的某個Signal，但這樣如果有第二個Widget的某Signal可以退出就麻煩了，得回來寫主函式，所以我選擇了自建信號這一方式，這樣就可以在MainWindow裡頭處理了。第二個是更改語言的，把語系告訴TR，讓TR辦這事；第三個是更新UI重翻譯的，上面說過了，載入新的Translator還不行，還得重新tr()翻譯一遍。
+程式主體壓軸：
+[cpp]
+//檔案：dialogs.cpp
+#include <QApplication>
+#include <QDesktopWidget>
+#include <QTextEdit>
+#include <QIcon>
+#include <QAction>
+#include <QActionGroup>
+#include <QMenuBar>
+#include <QMenu>
+#include <QStatusBar>
+#include <QLabel>
+#include <QTimer>
+#include <QDateTime>
+#include <QKeySequence>
+#include <QFontDialog>
+#include <QColorDialog>
+#include "dialogs.h"
+
+
+MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent)
+{
+  //TextEdit
+  textedit = new QTextEdit(tr("Input text here"),this);
+  setCentralWidget(textedit);
+
+  //StatusBar
+  msglabel = new QLabel();
+  statusBar() -> addWidget(msglabel);
+  statusBar() -> setStyleSheet("QStatusBar::item{border:0px;}");
+  QTimer *Timer = new QTimer(this);
+  connect(Timer, SIGNAL(timeout()), this, SLOT(Ticker()) );
+  Timer -> start(1000);
+
+  //Actions
+  FontDialogAction = new QAction(tr("Choose &Font..."),this);
+  connect(FontDialogAction, SIGNAL(triggered()), this, SLOT(setFont()) );
+  ColorDialogAction = new QAction(tr("Choose &Color..."),this);
+  connect(ColorDialogAction, SIGNAL(triggered()), this, SLOT(setColor()) );
+  ExitAction = new QAction(tr("&Quit..."),this);
+  ExitAction -> setShortcut(QKeySequence("Ctrl+Q"));
+  ExitAction -> setIcon(QIcon::fromTheme("window-close"));
+  connect(ExitAction, SIGNAL(triggered()), this, SIGNAL(ExitSignal()) );
+  //--
+  LC_en_US_Action = new QAction("&English",this);
+  LC_en_US_Action -> setCheckable(true);
+  LC_ja_JP_Action = new QAction("日本語(&J)",this);
+  LC_ja_JP_Action -> setCheckable(true);
+  LC_zh_CN_Action = new QAction("简体中文(&C)",this);
+  LC_zh_CN_Action -> setCheckable(true);
+  LC_zh_TW_Action = new QAction("正體中文(&T)",this);
+  LC_zh_TW_Action -> setCheckable(true);
+  LC_Group = new QActionGroup(this);
+  LC_Group -> addAction(LC_en_US_Action);
+  LC_Group -> addAction(LC_ja_JP_Action);
+  LC_Group -> addAction(LC_zh_CN_Action);
+  LC_Group -> addAction(LC_zh_TW_Action);
+  LC_Group -> setExclusive(true);
+  connect(LC_Group, SIGNAL(triggered(QAction *)), this, SLOT(LC_Changed()) );
+
+  //Menus
+  menu1 = new QMenu();
+  menu1 = menuBar() -> addMenu(tr("&Menu"));
+  menu1 -> addAction(FontDialogAction);
+  menu1 -> addAction(ColorDialogAction);
+  menu1 -> addAction(ExitAction);
+  menu2 = new QMenu();
+  menu2 = menuBar() -> addMenu(tr("&Locale"));
+  menu2 -> addAction(LC_en_US_Action);
+  menu2 -> addAction(LC_ja_JP_Action);
+  menu2 -> addAction(LC_zh_CN_Action);
+  menu2 -> addAction(LC_zh_TW_Action);
+
+  //Size and Position
+  setFixedSize(360,270);
+  QDesktopWidget *desktop = QApplication::desktop();
+  move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
+}
+
+
+MainWindow::~MainWindow(){
+
+}
+
+
+void MainWindow::setFont(){
+  bool ok;
+  QFont font = QFontDialog::getFont(&ok, textedit->currentFont(), this);
+  if(ok){
+    textedit -> setCurrentFont(font);
+  }
+}
+
+
+void MainWindow::setColor(){
+  QColor color = QColorDialog::getColor(textedit->textColor(), this);
+  if(color.isValid()){
+    textedit -> setTextColor(color);
+  }
+}
+
+void MainWindow::LC_init(QString init_lc){
+  if(init_lc == "en_US")
+    LC_en_US_Action -> setChecked(true);
+  else if(init_lc == "ja_JP")
+    LC_ja_JP_Action -> setChecked(true);
+  else if(init_lc == "zh_CN")
+    LC_zh_CN_Action -> setChecked(true);
+  else if(init_lc == "zh_TW")
+    LC_zh_TW_Action -> setChecked(true);
+}
+
+void MainWindow::LC_Changed(){
+  if(LC_en_US_Action -> isChecked())
+    LC_Change_Signal("en_US");
+  else if(LC_ja_JP_Action -> isChecked())
+    LC_Change_Signal("ja_JP");
+  else if(LC_zh_CN_Action -> isChecked())
+    LC_Change_Signal("zh_CN");
+  else if(LC_zh_TW_Action -> isChecked())
+    LC_Change_Signal("zh_TW");
+}
+
+
+void MainWindow::reTranslate(){
+  textedit -> setText(tr("Input text here"));
+  menu1 -> setTitle(tr("&Menu"));
+  menu2 -> setTitle(tr("&Locale"));
+  FontDialogAction -> setText(tr("Choose &Font..."));
+  ColorDialogAction -> setText(tr("Choose &Color..."));
+  ExitAction -> setText(tr("&Quit..."));
+}
+
+
+void MainWindow::Ticker(){
+  msglabel -> setText( QDateTime::currentDateTime().toString(tr("Now: dd/MM/yyyy hh:mm:ss")) );
+}
+[/cpp]
+「statusBar() -> setStyleSheet("QStatusBar::item{border:0px;}")」 —— 這句很扎眼：沒錯，這就是傳說中的QSS「Qt Style Sheet」！使狀態欄裡的所有項無邊線！QLabel在裡頭什麼都木有的時候，會顯示一條豎線，那是他的邊框，所以得這麼搞。
+後面是QTimer計時器，Qt提供的很方便的功能。這裡用作在狀態欄顯示時間，見Ticker()，在最底下。
+「LC_Group -> setExclusive(true)」當然就是設置單選囉~
+<pre>
+connect(LC_Group, SIGNAL(triggered(QAction *)), this, SLOT(LC_Changed()) );
+</pre>
+這句connect，前面的信號有參數，可後面槽沒有參數。這樣參數就被略過了。
+<pre>
+ExitAction -> setShortcut(QKeySequence("Ctrl+Q"));
+ExitAction -> setIcon(QIcon::fromTheme("window-close"));
+</pre>
+這兩句注意：前一句設定快捷鍵，直接用QKeySequence::Quit無效，誰知是怎麼回事，反正各個平台都是Ctrl+Q，乾脆直接定死了；後面一句設定圖標，我這裡就顯示不出來，我debug了一下，fromTheme，這個Theme是hicolor，而這裡頭恰好沒有window-close這個圖標……可我的圖標Theme設定的是「氧」啊！看來這裡面也很有學問，以後再來辦理這事。
+後面就沒啥可說的了……
