@@ -8,6 +8,8 @@
 #include <QModelIndex>
 #include <QToolBar>
 #include <QAction>
+#include <QIcon>
+#include <QKeySequence>
 #include <QFileDialog>
 #include <QDebug>
 #include "sqlbrowser.h"
@@ -15,6 +17,9 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+  //臨時性代碼
+  QIcon::setThemeName("oxygen");
+
   //資料表列表的Model&View
   tableListModel = new QStringListModel(this);
   tableList = new QListView(this);
@@ -33,9 +38,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
   //工具條
   openAction = new QAction(tr("Open file..."),this);
+  openAction -> setShortcut(QKeySequence("Ctrl+O"));
+  openAction -> setIcon(QIcon::fromTheme("document-open"));
   connect(openAction, SIGNAL(triggered()), this, SLOT(DB_Open()) );
+  submitAction = new QAction(tr("Save changes of current table"),this);
+  submitAction -> setEnabled(false);
+  submitAction -> setShortcut(QKeySequence("Ctrl+S"));
+  submitAction -> setIcon(QIcon::fromTheme("document-save"));
+  connect(submitAction, SIGNAL(triggered()), this, SLOT(SaveCurrent()) );
   QToolBar *toolbar = addToolBar(tr("Toolbar"));
   toolbar -> addAction(openAction);
+  toolbar -> addAction(submitAction);
 }
 
 
@@ -56,14 +69,20 @@ void MainWindow::DB_Open(){
 
 
 void MainWindow::SqliteOpen(QString whichDB){
+  //若已經打開一個資料庫則進行清理
   if(DB.isValid()){
     int tabsNum = tabs->count();
-    qDebug()<<tabsNum;
     for(int i=tabsNum; i >= 1; i--){
       tabs -> removeTab(i);
     }
+    tableView.clear();
+    tableModel.clear();
     OpenedTableList.clear();
+    qDebug()<<"Cleaning";
+    ListDebugging();
   }
+
+  //打開資料庫
   DB = QSqlDatabase::addDatabase("QSQLITE");
   DB.setDatabaseName(whichDB);
   if(DB.open()){
@@ -85,25 +104,56 @@ int MainWindow::OpenTable(const QModelIndex &idx){
     OpenedTableList << whichTable;
 
   //創建SqlTableModel
-  QSqlTableModel *tableModel;
-  tableModel = new QSqlTableModel(this,DB);
-  tableModel -> setTable(whichTable);
-  tableModel -> select();
+  QSqlTableModel *tableModela;
+  tableModela = new QSqlTableModel(this,DB);
+  tableModela -> setEditStrategy(QSqlTableModel::OnManualSubmit);
+  tableModela -> setTable(whichTable);
+  tableModela -> select();
+  tableModel.append(tableModela);
 
   //創建對應的TableView
-  QTableView *tableView;
-  tableView = new QTableView(this);
-  tableView -> setModel(tableModel);
+  QTableView *tableViewa;
+  tableViewa = new QTableView(this);
+  tableViewa -> setModel(tableModela);
+  tableViewa -> resizeColumnsToContents();
+  tableView.append(tableViewa);
+
   //新加標籤
-  tabs -> addTab(tableView,whichTable);
+  tabs -> addTab(tableViewa,whichTable);
   //轉到標籤
   tabs -> setCurrentIndex(tabs->count() - 1);
+
+  qDebug()<<"Opening:"<<whichTable;
+  ListDebugging();
+
   return 0;
 }
 
 void MainWindow::tabClosing(int whichTab){
   if(whichTab != 0){
   OpenedTableList.removeOne(tabs->tabText(whichTab));
+  tableView.removeAt(whichTab-1);
+  tableModel.removeAt(whichTab-1);
   tabs -> removeTab(whichTab);
+  qDebug()<<"Closing:"<<whichTab;
+  ListDebugging();
+  }
+}
+
+void MainWindow::ListDebugging(){
+  qDebug()<<"tableView:"<<tableView.count();
+  qDebug()<<"tableModel:"<<tableModel.count();
+}
+
+void MainWindow::SaveCurrent(){
+  int save_index = tabs->currentIndex()-1;
+  if(save_index >= 0){
+    DB.transaction();
+    if(tableModel[save_index] -> submitAll()){
+      DB.commit();
+    }else{
+      DB.rollback();
+      qDebug()<<"Error while submiting data.";
+    }
   }
 }
