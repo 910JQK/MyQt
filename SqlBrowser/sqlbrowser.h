@@ -22,9 +22,11 @@ public slots:
   void DB_Open();
   void SqliteOpen(QString whichDB);
   int OpenTable(const QModelIndex &idx);
+  void tabChanged(int whichTab);
   void tabClosing(int whichTab);
-  void ListDebugging();
   void SaveCurrent();
+  void SetDirty();
+  void NotDirty();
 private:
   QSqlDatabase DB;
   QStringList OpenedTableList;
@@ -35,4 +37,8 @@ private:
   QAction *submitAction;
   QList<QSqlTableModel*> tableModel;
   QList<QTableView*> tableView;
+  QList<bool> tableDirty;
+  QString DBNAME;
+  int tableIndex();
+  void ListDebugging();
 };

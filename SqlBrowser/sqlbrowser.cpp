@@ -27,12 +27,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   tableList -> setModel(tableListModel);
   connect(tableList, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(OpenTable(const QModelIndex &)) );
 
+  //DirtyList
+  tableDirty<<false;
+
   //標籤
   tabs = new QTabWidget(this);
   tabs -> setTabsClosable(true);
   tabs -> addTab(tableList,tr("Tables"));
   //Fucking protected element
   //tabs -> tabBar() -> tabButton(0,QTabBar::RightSide) -> hide();
+  connect(tabs, SIGNAL(currentChanged(int)), this, SLOT(tabChanged(int)) );
   connect(tabs, SIGNAL(tabCloseRequested(int)), this, SLOT(tabClosing(int)) );
   setCentralWidget(tabs);
 
@@ -77,7 +81,11 @@ void MainWindow::SqliteOpen(QString whichDB){
     }
     tableView.clear();
     tableModel.clear();
+    tableDirty.clear();
+    tableDirty<<false;
     OpenedTableList.clear();
+    DB.close();
+    DB.removeDatabase(DBNAME);
     qDebug()<<"Cleaning";
     ListDebugging();
   }
@@ -87,6 +95,7 @@ void MainWindow::SqliteOpen(QString whichDB){
   DB.setDatabaseName(whichDB);
   if(DB.open()){
     tableListModel -> setStringList(DB.tables());
+    DBNAME=whichDB;
   }else{
     qDebug() << "Error:Cannot open database " + whichDB + " - " + DB.lastError().text();
   }
@@ -110,6 +119,7 @@ int MainWindow::OpenTable(const QModelIndex &idx){
   tableModela -> setTable(whichTable);
   tableModela -> select();
   tableModel.append(tableModela);
+  connect(tableModela, SIGNAL(dataChanged(const QModelIndex & , const QModelIndex &)), this, SLOT(SetDirty()) );
 
   //創建對應的TableView
   QTableView *tableViewa;
@@ -118,16 +128,36 @@ int MainWindow::OpenTable(const QModelIndex &idx){
   tableViewa -> resizeColumnsToContents();
   tableView.append(tableViewa);
 
+  //DirtyList
+  tableDirty<<false;
+
   //新加標籤
   tabs -> addTab(tableViewa,whichTable);
+  //設定圖標
+  tabs -> setTabIcon(tabs->count()-1, QIcon::fromTheme("folder"));
   //轉到標籤
-  tabs -> setCurrentIndex(tabs->count() - 1);
+  tabs -> setCurrentIndex(tabs->count()-1);
 
+  //Debug
   qDebug()<<"Opening:"<<whichTable;
   ListDebugging();
-
+  
+  //返回值
   return 0;
 }
+
+
+void MainWindow::tabChanged(int whichTab){
+  if(whichTab != 0){
+    if(tableDirty[whichTab])
+      submitAction -> setEnabled(true);
+    else
+      submitAction -> setEnabled(false);
+  }else{
+    submitAction -> setEnabled(false);
+  }
+}
+
 
 void MainWindow::tabClosing(int whichTab){
   if(whichTab != 0){
@@ -140,20 +170,42 @@ void MainWindow::tabClosing(int whichTab){
   }
 }
 
+
 void MainWindow::ListDebugging(){
   qDebug()<<"tableView:"<<tableView.count();
   qDebug()<<"tableModel:"<<tableModel.count();
 }
 
+
+int MainWindow::tableIndex(){
+  return tabs->currentIndex()-1;
+}
+
+
 void MainWindow::SaveCurrent(){
-  int save_index = tabs->currentIndex()-1;
+  int save_index = tableIndex();
   if(save_index >= 0){
     DB.transaction();
     if(tableModel[save_index] -> submitAll()){
       DB.commit();
+      NotDirty();
     }else{
       DB.rollback();
       qDebug()<<"Error while submiting data.";
     }
   }
+}
+
+
+void MainWindow::SetDirty(){
+      tableDirty[tabs->currentIndex()]=true;
+      submitAction -> setEnabled(true);
+      tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder-open"));
+}
+
+
+void MainWindow::NotDirty(){
+      tableDirty[tabs->currentIndex()]=false;
+      submitAction -> setEnabled(false);
+      tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder"));
 }
