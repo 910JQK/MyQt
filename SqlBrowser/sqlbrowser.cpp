@@ -44,15 +44,32 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   openAction = new QAction(tr("Open file..."),this);
   openAction -> setShortcut(QKeySequence("Ctrl+O"));
   openAction -> setIcon(QIcon::fromTheme("document-open"));
-  connect(openAction, SIGNAL(triggered()), this, SLOT(DB_Open()) );
   submitAction = new QAction(tr("Save changes of current table"),this);
   submitAction -> setEnabled(false);
   submitAction -> setShortcut(QKeySequence("Ctrl+S"));
   submitAction -> setIcon(QIcon::fromTheme("document-save"));
+  revertAction = new QAction(tr("Revert all changes of current table"),this);
+  revertAction -> setEnabled(false);
+  revertAction -> setShortcut(QKeySequence("Ctrl+R"));
+  revertAction -> setIcon(QIcon::fromTheme("document-revert"));
+  addAction = new QAction(tr("Add a row record to current table"),this);
+  addAction -> setEnabled(false);
+  addAction -> setIcon(QIcon::fromTheme("list-add"));
+  delAction = new QAction(tr("Delete a row record from current table"),this);
+  delAction -> setEnabled(false);
+  delAction -> setIcon(QIcon::fromTheme("list-remove"));
+  connect(openAction, SIGNAL(triggered()), this, SLOT(DB_Open()) );
   connect(submitAction, SIGNAL(triggered()), this, SLOT(SaveCurrent()) );
+  connect(revertAction, SIGNAL(triggered()), this, SLOT(RevertCurrent()) );
+  connect(addAction, SIGNAL(triggered()), this, SLOT(AddCurrent()) );
+  connect(delAction, SIGNAL(triggered()), this, SLOT(DelCurrent()) );
+  //--
   QToolBar *toolbar = addToolBar(tr("Toolbar"));
   toolbar -> addAction(openAction);
   toolbar -> addAction(submitAction);
+  toolbar -> addAction(revertAction);
+  toolbar -> addAction(addAction);
+  toolbar -> addAction(delAction);
 }
 
 
@@ -127,6 +144,7 @@ int MainWindow::OpenTable(const QModelIndex &idx){
   tableViewa -> setModel(tableModela);
   tableViewa -> resizeColumnsToContents();
   tableView.append(tableViewa);
+  connect(tableViewa, SIGNAL(viewportEntered()), this, SLOT(CheckDeletable()) );
 
   //DirtyList
   tableDirty<<false;
@@ -149,12 +167,21 @@ int MainWindow::OpenTable(const QModelIndex &idx){
 
 void MainWindow::tabChanged(int whichTab){
   if(whichTab != 0){
-    if(tableDirty[whichTab])
+    if(tableDirty[whichTab]){
       submitAction -> setEnabled(true);
-    else
+      revertAction -> setEnabled(true);
+      qDebug()<<"Table "<<whichTab<<":Dirty";
+    }else{
       submitAction -> setEnabled(false);
+      revertAction -> setEnabled(false);
+      qDebug()<<"Table "<<whichTab<<":Non-dirty";
+    }
+    addAction -> setEnabled(true);
+    CheckDeletable();
   }else{
     submitAction -> setEnabled(false);
+    revertAction -> setEnabled(false);
+    delAction -> setEnabled(false);
   }
 }
 
@@ -164,6 +191,7 @@ void MainWindow::tabClosing(int whichTab){
   OpenedTableList.removeOne(tabs->tabText(whichTab));
   tableView.removeAt(whichTab-1);
   tableModel.removeAt(whichTab-1);
+  tableDirty.removeAt(whichTab);
   tabs -> removeTab(whichTab);
   qDebug()<<"Closing:"<<whichTab;
   ListDebugging();
@@ -182,30 +210,70 @@ int MainWindow::tableIndex(){
 }
 
 
+void MainWindow::AddCurrent(){
+  int add_index = tableIndex();
+  tableModel[add_index] -> insertRow(tableModel[add_index]->rowCount());
+  SetDirty();
+}
+
+
+void MainWindow::DelCurrent(){
+  int del_index = tableIndex();
+  //獲取被選擇列
+  QList<int> del_rows;
+  foreach(const QModelIndex &index, tableView[del_index]->selectionModel()->selection().indexes() ){
+    del_rows.append(index.row());
+  }
+  //從後往前刪
+  qSort(del_rows);
+  for(int i = del_rows.count()+1; i>=0; i--){
+    tableModel[del_index] -> removeRow(del_rows[i]);
+  }
+  SetDirty();
+}
+
+
 void MainWindow::SaveCurrent(){
   int save_index = tableIndex();
-  if(save_index >= 0){
-    DB.transaction();
-    if(tableModel[save_index] -> submitAll()){
-      DB.commit();
-      NotDirty();
-    }else{
-      DB.rollback();
-      qDebug()<<"Error while submiting data.";
-    }
+  DB.transaction();
+  if(tableModel[save_index] -> submitAll()){
+    DB.commit();
+    NotDirty();
+  }else{
+    DB.rollback();
+    qDebug()<<"Error while submiting data.";
   }
 }
 
 
+void MainWindow::RevertCurrent(){
+  int revert_index = tableIndex();
+  tableModel[revert_index] -> revertAll();
+  NotDirty();
+}
+
+
 void MainWindow::SetDirty(){
-      tableDirty[tabs->currentIndex()]=true;
-      submitAction -> setEnabled(true);
-      tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder-open"));
+  tableDirty[tabs->currentIndex()]=true;
+  submitAction -> setEnabled(true);
+  revertAction -> setEnabled(true);
+  tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder-open"));
 }
 
 
 void MainWindow::NotDirty(){
-      tableDirty[tabs->currentIndex()]=false;
-      submitAction -> setEnabled(false);
-      tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder"));
+  tableDirty[tabs->currentIndex()]=false;
+  submitAction -> setEnabled(false);
+  revertAction -> setEnabled(false);
+  tabs -> setTabIcon(tabs->currentIndex(), QIcon::fromTheme("folder"));
+}
+
+
+void MainWindow::CheckDeletable(){
+  if(tabs->currentIndex() != 0){
+    if(tableView[tabs->currentIndex()-1]->selectionModel()->hasSelection())
+      delAction -> setEnabled(true);
+    else
+      delAction -> setEnabled(false);
+  }
 }

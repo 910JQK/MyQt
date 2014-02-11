@@ -24,9 +24,13 @@ public slots:
   int OpenTable(const QModelIndex &idx);
   void tabChanged(int whichTab);
   void tabClosing(int whichTab);
+  void AddCurrent();
+  void DelCurrent();
   void SaveCurrent();
+  void RevertCurrent();
   void SetDirty();
   void NotDirty();
+  void CheckDeletable();
 private:
   QSqlDatabase DB;
   QStringList OpenedTableList;
@@ -35,6 +39,9 @@ private:
   QTabWidget *tabs;
   QAction *openAction;
   QAction *submitAction;
+  QAction *revertAction;
+  QAction *addAction;
+  QAction *delAction;
   QList<QSqlTableModel*> tableModel;
   QList<QTableView*> tableView;
   QList<bool> tableDirty;
