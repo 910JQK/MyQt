@@ -10,6 +10,7 @@ class QString;
 class QModelIndex;
 class QListView;
 class QTabWidget;
+class QLineEdit;
 class QAction;
 class QSqlDatabase;
 
@@ -31,12 +32,14 @@ public slots:
   void SetDirty();
   void NotDirty();
   void CheckDeletable();
+  void do_query();
 private:
   QSqlDatabase DB;
   QStringList OpenedTableList;
   QStringListModel *tableListModel;
   QListView *tableList;
   QTabWidget *tabs;
+  QLineEdit *queryEdit;
   QAction *openAction;
   QAction *submitAction;
   QAction *revertAction;

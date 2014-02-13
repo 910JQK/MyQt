@@ -1,16 +1,22 @@
 #include <QSqlDatabase>
 #include <QSqlError>
+#include <QSqlQuery>
 #include <QTabWidget>
 #include <QStringListModel>
 #include <QListView>
 #include <QSqlTableModel>
 #include <QTableView>
+#include <QLineEdit>
 #include <QModelIndex>
 #include <QToolBar>
+#include <QStatusBar>
+#include <QDockWidget>
 #include <QAction>
 #include <QIcon>
 #include <QKeySequence>
 #include <QFileDialog>
+#include <QApplication>
+#include <QDesktopWidget>
 #include <QDebug>
 #include "sqlbrowser.h"
 
@@ -70,6 +76,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   toolbar -> addAction(revertAction);
   toolbar -> addAction(addAction);
   toolbar -> addAction(delAction);
+
+  //狀態列
+  queryEdit = new QLineEdit;
+  queryEdit -> setPlaceholderText(tr("Input SQL command here"));
+  queryEdit -> setEnabled(false);
+  connect(queryEdit, SIGNAL(returnPressed()), this, SLOT(do_query()) );
+  QDockWidget *dock = new QDockWidget("SqlQuery",this);
+  dock -> setWidget(queryEdit);
+  dock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
+  addDockWidget(Qt::BottomDockWidgetArea, dock);
+
+  //Size and Position
+  resize(680,360);
+  QDesktopWidget *desktop = QApplication::desktop();
+  move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
 }
 
 
@@ -176,11 +197,14 @@ void MainWindow::tabChanged(int whichTab){
       revertAction -> setEnabled(false);
       qDebug()<<"Table "<<whichTab<<":Non-dirty";
     }
+    queryEdit -> setEnabled(true);
     addAction -> setEnabled(true);
     CheckDeletable();
   }else{
     submitAction -> setEnabled(false);
     revertAction -> setEnabled(false);
+    queryEdit -> setEnabled(false);
+    addAction -> setEnabled(false);
     delAction -> setEnabled(false);
   }
 }
@@ -218,16 +242,27 @@ void MainWindow::AddCurrent(){
 
 
 void MainWindow::DelCurrent(){
+  //Index
   int del_index = tableIndex();
+
   //獲取被選擇列
   QList<int> del_rows;
   foreach(const QModelIndex &index, tableView[del_index]->selectionModel()->selection().indexes() ){
     del_rows.append(index.row());
   }
-  //從後往前刪
+
+  //排序
   qSort(del_rows);
+
+  //保護機制：序號一樣的新加行
+  int prev = -1;
+  //從後往前刪
   for(int i = del_rows.count()+1; i>=0; i--){
-    tableModel[del_index] -> removeRow(del_rows[i]);
+    int delCurrent = del_rows[i];
+    if(delCurrent != prev){
+    tableModel[del_index] -> removeRow(delCurrent);
+    prev = delCurrent;
+    }
   }
   SetDirty();
 }
@@ -275,5 +310,16 @@ void MainWindow::CheckDeletable(){
       delAction -> setEnabled(true);
     else
       delAction -> setEnabled(false);
+  }
+}
+
+
+void MainWindow::do_query(){
+  QSqlQuery query = tableModel[tabs->currentIndex()-1]->query();
+  if(!query.exec(queryEdit->text()) ){
+    qDebug()<<"Error while executing SQL command";
+  }else{
+    queryEdit -> setText("");
+    tableListModel -> setStringList(DB.tables());
   }
 }
