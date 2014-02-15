@@ -30,11 +30,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   tableListModel = new QStringListModel(this);
   tableList = new QListView(this);
   tableList -> setEditTriggers(QAbstractItemView::EditKeyPressed);
+  tableList -> setViewMode(QListView::IconMode);
   tableList -> setModel(tableListModel);
   connect(tableList, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(OpenTable(const QModelIndex &)) );
 
-  //DirtyList
+  //ListInit
   tableDirty<<false;
+  tabType<<1;
 
   //標籤
   tabs = new QTabWidget(this);
@@ -56,8 +58,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   submitAction -> setIcon(QIcon::fromTheme("document-save"));
   revertAction = new QAction(tr("Revert all changes of current table"),this);
   revertAction -> setEnabled(false);
-  revertAction -> setShortcut(QKeySequence("Ctrl+R"));
   revertAction -> setIcon(QIcon::fromTheme("document-revert"));
+  refreshAction = new QAction(tr("Revert all changes of current table and refresh data from database"),this);
+  refreshAction -> setEnabled(false);
+  refreshAction -> setIcon(QIcon::fromTheme("view-refresh"));
   addAction = new QAction(tr("Add a row record to current table"),this);
   addAction -> setEnabled(false);
   addAction -> setIcon(QIcon::fromTheme("list-add"));
@@ -67,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   connect(openAction, SIGNAL(triggered()), this, SLOT(DB_Open()) );
   connect(submitAction, SIGNAL(triggered()), this, SLOT(SaveCurrent()) );
   connect(revertAction, SIGNAL(triggered()), this, SLOT(RevertCurrent()) );
+  connect(refreshAction, SIGNAL(triggered()), this, SLOT(RefreshCurrent()) );
   connect(addAction, SIGNAL(triggered()), this, SLOT(AddCurrent()) );
   connect(delAction, SIGNAL(triggered()), this, SLOT(DelCurrent()) );
   //--
@@ -74,21 +79,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   toolbar -> addAction(openAction);
   toolbar -> addAction(submitAction);
   toolbar -> addAction(revertAction);
+  toolbar -> addAction(refreshAction);
   toolbar -> addAction(addAction);
   toolbar -> addAction(delAction);
 
-  //狀態列
+  //DockWidget
   queryEdit = new QLineEdit;
   queryEdit -> setPlaceholderText(tr("Input SQL command here"));
   queryEdit -> setEnabled(false);
   connect(queryEdit, SIGNAL(returnPressed()), this, SLOT(do_query()) );
-  QDockWidget *dock = new QDockWidget("SqlQuery",this);
+  dock = new QDockWidget("SqlQuery",this);
   dock -> setWidget(queryEdit);
   dock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
   addDockWidget(Qt::BottomDockWidgetArea, dock);
 
   //Size and Position
-  resize(680,360);
+  resize(720,400);
   QDesktopWidget *desktop = QApplication::desktop();
   move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
 }
@@ -119,8 +125,12 @@ void MainWindow::SqliteOpen(QString whichDB){
     }
     tableView.clear();
     tableModel.clear();
+    queryList.clear();
+    queryModel.clear();
     tableDirty.clear();
+    tabType.clear();
     tableDirty<<false;
+    tabType<<1;
     OpenedTableList.clear();
     DB.close();
     DB.removeDatabase(DBNAME);
@@ -133,9 +143,11 @@ void MainWindow::SqliteOpen(QString whichDB){
   DB.setDatabaseName(whichDB);
   if(DB.open()){
     tableListModel -> setStringList(DB.tables());
+    queryEdit -> setEnabled(true);
     DBNAME=whichDB;
   }else{
     qDebug() << "Error:Cannot open database " + whichDB + " - " + DB.lastError().text();
+    queryEdit -> setEnabled(false);
   }
 }
 
@@ -164,11 +176,13 @@ int MainWindow::OpenTable(const QModelIndex &idx){
   tableViewa = new QTableView(this);
   tableViewa -> setModel(tableModela);
   tableViewa -> resizeColumnsToContents();
+  tableViewa -> setMouseTracking(true);
   tableView.append(tableViewa);
   connect(tableViewa, SIGNAL(viewportEntered()), this, SLOT(CheckDeletable()) );
 
-  //DirtyList
+  //List
   tableDirty<<false;
+  tabType<<0;
 
   //新加標籤
   tabs -> addTab(tableViewa,whichTable);
@@ -187,7 +201,8 @@ int MainWindow::OpenTable(const QModelIndex &idx){
 
 
 void MainWindow::tabChanged(int whichTab){
-  if(whichTab != 0){
+  switch(tabType[whichTab]){
+  case 0: //Table
     if(tableDirty[whichTab]){
       submitAction -> setEnabled(true);
       revertAction -> setEnabled(true);
@@ -197,25 +212,41 @@ void MainWindow::tabChanged(int whichTab){
       revertAction -> setEnabled(false);
       qDebug()<<"Table "<<whichTab<<":Non-dirty";
     }
-    queryEdit -> setEnabled(true);
     addAction -> setEnabled(true);
+    refreshAction -> setEnabled(true);
     CheckDeletable();
-  }else{
+    break;
+  case 1 ... 2 : //TableList,QueryResult
     submitAction -> setEnabled(false);
     revertAction -> setEnabled(false);
-    queryEdit -> setEnabled(false);
+    refreshAction -> setEnabled(false);
     addAction -> setEnabled(false);
     delAction -> setEnabled(false);
+    qDebug()<<"Tab "<<whichTab<<":TableList/QueryList";
+    break;
   }
 }
 
 
 void MainWindow::tabClosing(int whichTab){
-  if(whichTab != 0){
-  OpenedTableList.removeOne(tabs->tabText(whichTab));
+  int tType = tabType[whichTab];
+  if(tType != 1){
   tableView.removeAt(whichTab-1);
-  tableModel.removeAt(whichTab-1);
+  tableModel.removeAt(whichTab-1); //sb已補
   tableDirty.removeAt(whichTab);
+  tabType.removeAt(whichTab);
+  if(tType == 2){
+    QString queryTemp = tabs->tabText(whichTab);
+    int queryNum = queryTemp.remove("Query").toInt();
+    qDebug()<<"Closing Query Tab "<<whichTab;
+    qDebug()<<"queryTemp"<<queryTemp;
+    qDebug()<<"queryNum"<<queryNum;
+    qDebug()<<"queryCount"<<queryList.count();
+    queryList.removeAt(queryNum);
+    queryModel.removeAt(queryNum);
+  }else{
+    OpenedTableList.removeOne(tabs->tabText(whichTab));
+  }
   tabs -> removeTab(whichTab);
   qDebug()<<"Closing:"<<whichTab;
   ListDebugging();
@@ -288,6 +319,15 @@ void MainWindow::RevertCurrent(){
 }
 
 
+void MainWindow::RefreshCurrent(){
+  int rf_index = tableIndex();
+  tableModel[rf_index] -> revertAll();
+  tableModel[rf_index] -> select();
+//tableView[rf_index] -> setModel(tableModel[rf_index]);
+  NotDirty();
+}
+
+
 void MainWindow::SetDirty(){
   tableDirty[tabs->currentIndex()]=true;
   submitAction -> setEnabled(true);
@@ -310,16 +350,52 @@ void MainWindow::CheckDeletable(){
       delAction -> setEnabled(true);
     else
       delAction -> setEnabled(false);
+  }else{
+      delAction -> setEnabled(false);
   }
 }
 
 
 void MainWindow::do_query(){
-  QSqlQuery query = tableModel[tabs->currentIndex()-1]->query();
-  if(!query.exec(queryEdit->text()) ){
+  QSqlQuery Query;
+  QString queryStr = queryEdit->text();
+  if(!Query.exec(queryStr) ){
     qDebug()<<"Error while executing SQL command";
   }else{
+    qDebug()<< Query.numRowsAffected() << "Row(s) affected";
+    dock -> setWindowTitle(tr("SqlQuery : %n row(s) affected.", 0, Query.numRowsAffected() ));
     queryEdit -> setText("");
-    tableListModel -> setStringList(DB.tables());
+    tableListModel -> setStringList(DB.tables()); // Refresh Table List
+    queryList.append(&Query);
+    if(Query.isSelect()){
+      //創建SqlQueryModel
+      QSqlQueryModel *qModela;
+      QSqlTableModel *sbModela;
+      qModela = new QSqlQueryModel(this);
+      sbModela = new QSqlTableModel(this,DB);
+      qModela -> setQuery(Query);
+      tableModel.append(sbModela);
+      queryModel.append(qModela);
+      
+      //創建對應的TableView
+      QTableView *qViewa;
+      qViewa = new QTableView(this);
+      qViewa -> setModel(qModela);
+      qViewa -> resizeColumnsToContents();
+      tableView.append(qViewa);
+
+      //List
+      tableDirty<<false;
+      tabType<<2;
+
+      //新加標籤
+      tabs -> addTab(qViewa,"Query"+QString::number(queryList.count()-1));
+      //設定工具提示
+      tabs -> setTabToolTip(tabs->count()-1, queryStr);
+      //設定圖標
+      tabs -> setTabIcon(tabs->count()-1, QIcon::fromTheme("mail-read"));
+      //轉到標籤
+      tabs -> setCurrentIndex(tabs->count()-1);
+    }
   }
 }

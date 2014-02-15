@@ -10,9 +10,11 @@ class QString;
 class QModelIndex;
 class QListView;
 class QTabWidget;
+class QDockWidget;
 class QLineEdit;
 class QAction;
-class QSqlDatabase;
+class QSqlQuery;
+class QSqlQueryModel;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -29,6 +31,7 @@ public slots:
   void DelCurrent();
   void SaveCurrent();
   void RevertCurrent();
+  void RefreshCurrent();
   void SetDirty();
   void NotDirty();
   void CheckDeletable();
@@ -39,15 +42,20 @@ private:
   QStringListModel *tableListModel;
   QListView *tableList;
   QTabWidget *tabs;
+  QDockWidget *dock;
   QLineEdit *queryEdit;
   QAction *openAction;
   QAction *submitAction;
   QAction *revertAction;
+  QAction *refreshAction;
   QAction *addAction;
   QAction *delAction;
   QList<QSqlTableModel*> tableModel;
   QList<QTableView*> tableView;
   QList<bool> tableDirty;
+  QList<int> tabType;
+  QList<QSqlQuery*> queryList;
+  QList<QSqlQueryModel*> queryModel;
   QString DBNAME;
   int tableIndex();
   void ListDebugging();
