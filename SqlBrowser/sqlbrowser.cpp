@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   tableListModel = new QStringListModel(this);
   tableList = new QListView(this);
   tableList -> setEditTriggers(QAbstractItemView::EditKeyPressed);
-  tableList -> setViewMode(QListView::IconMode);
+  //tableList -> setViewMode(QListView::IconMode);
   tableList -> setModel(tableListModel);
   connect(tableList, SIGNAL(doubleClicked(const QModelIndex &)), this, SLOT(OpenTable(const QModelIndex &)) );
 
@@ -41,7 +41,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   //標籤
   tabs = new QTabWidget(this);
   tabs -> setTabsClosable(true);
-  tabs -> addTab(tableList,tr("Tables"));
+  tabs -> addTab(tableList,QIcon::fromTheme("x-office-document"),tr("Tables"));
   //Fucking protected element
   //tabs -> tabBar() -> tabButton(0,QTabBar::RightSide) -> hide();
   connect(tabs, SIGNAL(currentChanged(int)), this, SLOT(tabChanged(int)) );
@@ -178,7 +178,7 @@ int MainWindow::OpenTable(const QModelIndex &idx){
   tableViewa -> resizeColumnsToContents();
   tableViewa -> setMouseTracking(true);
   tableView.append(tableViewa);
-  connect(tableViewa, SIGNAL(viewportEntered()), this, SLOT(CheckDeletable()) );
+  connect(tableViewa->selectionModel(), SIGNAL(selectionChanged(const QItemSelection &, const QItemSelection &)), this, SLOT(CheckDeletable()) );
 
   //List
   tableDirty<<false;
