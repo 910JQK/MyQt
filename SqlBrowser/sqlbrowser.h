@@ -1,3 +1,5 @@
+#ifndef SQLBROWSER_SQLBROWSER_H_
+#define SQLBROWSER_SQLBROWSER_H_
 #include <QMainWindow>
 #include <QStringList>
 #include <QSqlDatabase>
@@ -24,6 +26,8 @@ public:
 public slots:
   void DB_Open();
   void SqliteOpen(QString whichDB);
+  void MySqlOpen(QString host, int port, QString user, QString passwd, QString dbName);
+  void OpenClear();
   int OpenTable(const QModelIndex &idx);
   void tabChanged(int whichTab);
   void tabClosing(int whichTab);
@@ -60,3 +64,5 @@ private:
   int tableIndex();
   void ListDebugging();
 };
+
+#endif //SQLBROWSER_SQLBROWSER_H_

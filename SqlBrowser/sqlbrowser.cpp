@@ -18,6 +18,9 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QDebug>
+#include <iostream>
+#include <termios.h>
+#include <unistd.h>
 #include "sqlbrowser.h"
 
 
@@ -56,16 +59,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   submitAction -> setEnabled(false);
   submitAction -> setShortcut(QKeySequence("Ctrl+S"));
   submitAction -> setIcon(QIcon::fromTheme("document-save"));
-  revertAction = new QAction(tr("Revert all changes of current table"),this);
+  revertAction = new QAction(tr("Revert all changes of the current table"),this);
   revertAction -> setEnabled(false);
   revertAction -> setIcon(QIcon::fromTheme("document-revert"));
-  refreshAction = new QAction(tr("Revert all changes of current table and refresh data from database"),this);
+  refreshAction = new QAction(tr("Revert all changes of the current table and refresh data from database"),this);
   refreshAction -> setEnabled(false);
   refreshAction -> setIcon(QIcon::fromTheme("view-refresh"));
-  addAction = new QAction(tr("Add a row record to current table"),this);
+  addAction = new QAction(tr("Add a row record to the current table"),this);
   addAction -> setEnabled(false);
   addAction -> setIcon(QIcon::fromTheme("list-add"));
-  delAction = new QAction(tr("Delete a row record from current table"),this);
+  delAction = new QAction(tr("Delete selected row-records from the current table"),this);
   delAction -> setEnabled(false);
   delAction -> setIcon(QIcon::fromTheme("list-remove"));
   connect(openAction, SIGNAL(triggered()), this, SLOT(DB_Open()) );
@@ -97,6 +100,82 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   resize(720,400);
   QDesktopWidget *desktop = QApplication::desktop();
   move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
+
+  //Handle the arguments
+  QString DB_Type = "QSQLITE";
+  QString sqlHost;
+  int sqlPort = 3306;
+  QString sqlUser;
+  QString sqlPasswd;
+  QString sqlDB;
+  QStringListIterator args(QApplication::arguments());
+  int ac = QApplication::arguments().count();
+  if(ac > 1){
+    args.next(); //GoToPos 0
+    while(args.hasNext()){ //Read 1 by 1
+      const QString &a = args.next();
+      bool optsEnd = false;
+      //SQLite3DBFile
+      if(!args.hasNext() && DB_Type=="QSQLITE"){
+	SqliteOpen(a);
+      }
+      if(a == "--"){ //End of options
+	optsEnd = true;
+      }
+      if(optsEnd == false){
+	if(a == "--mysql" || a == "-m"){
+	  DB_Type = "QMYSQL";
+	}
+	else if(a == "--host" || a == "-h"){
+	  if(args.hasNext()){
+	    sqlHost = args.next();
+	  }
+	}
+	else if(a == "--port" || a == "-p"){
+	  if(args.hasNext()){
+	    sqlPort = args.next().toInt();
+	  }
+	}
+	else if(a == "--user" || a == "-u"){
+	  if(args.hasNext()){
+	    sqlUser = args.next();
+	  }
+	}
+	else if(a == "--database" || a == "-d"){
+	  if(args.hasNext()){
+	    sqlDB = args.next();
+	  }
+	}
+      }
+    }
+    if(DB_Type == "QMYSQL"){
+      //CheckEnough
+      if(sqlHost.isEmpty() || sqlUser.isEmpty() || sqlDB.isEmpty()){
+	qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
+      }
+
+      //GetPassword
+      qDebug().nospace()<<tr("Password:");
+      //HideInput
+      termios oldt;
+      tcgetattr(STDIN_FILENO, &oldt);
+      termios newt = oldt;
+      newt.c_lflag &= ~ECHO;
+      tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+      //Get
+      std::string s;
+      getline(std::cin, s);
+      sqlPasswd = QString::fromStdString(s); 
+      s="";
+      //Reset
+      newt.c_lflag |= ECHO;
+      tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+      
+      //Open
+      MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
+      sqlPasswd="";
+    }
+  }
 }
 
 
@@ -117,6 +196,42 @@ void MainWindow::DB_Open(){
 
 
 void MainWindow::SqliteOpen(QString whichDB){
+  OpenClear();
+  //打開資料庫
+  DB = QSqlDatabase::addDatabase("QSQLITE");
+  DB.setDatabaseName(whichDB);
+  if(DB.open()){
+    tableListModel -> setStringList(DB.tables());
+    queryEdit -> setEnabled(true);
+    DBNAME=whichDB;
+  }else{
+    qDebug() << "Error:Cannot open database " + whichDB + " - " + DB.lastError().text();
+    queryEdit -> setEnabled(false);
+  }
+}
+
+
+void MainWindow::MySqlOpen(QString host, int port, QString user, QString passwd, QString dbName){
+  OpenClear();
+  //打開資料庫
+  DB = QSqlDatabase::addDatabase("QMYSQL");
+  DB.setHostName(host);
+  DB.setPort(port);
+  DB.setUserName(user);
+  DB.setPassword(passwd);
+  DB.setDatabaseName(dbName);
+  if(DB.open()){
+    tableListModel -> setStringList(DB.tables());
+    queryEdit -> setEnabled(true);
+    DBNAME=dbName;
+  }else{
+    qDebug() << "Error:Cannot open database " + dbName + " - " + DB.lastError().text();
+    queryEdit -> setEnabled(false);
+  }
+}
+
+
+void MainWindow::OpenClear(){
   //若已經打開一個資料庫則進行清理
   if(DB.isValid()){
     int tabsNum = tabs->count();
@@ -136,18 +251,6 @@ void MainWindow::SqliteOpen(QString whichDB){
     DB.removeDatabase(DBNAME);
     qDebug()<<"Cleaning";
     ListDebugging();
-  }
-
-  //打開資料庫
-  DB = QSqlDatabase::addDatabase("QSQLITE");
-  DB.setDatabaseName(whichDB);
-  if(DB.open()){
-    tableListModel -> setStringList(DB.tables());
-    queryEdit -> setEnabled(true);
-    DBNAME=whichDB;
-  }else{
-    qDebug() << "Error:Cannot open database " + whichDB + " - " + DB.lastError().text();
-    queryEdit -> setEnabled(false);
   }
 }
 
