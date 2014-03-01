@@ -17,12 +17,15 @@ class QLineEdit;
 class QAction;
 class QSqlQuery;
 class QSqlQueryModel;
+class QApplication;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
 public:
   MainWindow(QWidget *parent = 0);
   ~MainWindow();
+  static void OutputHelp();
+  static std::string stdTr(std::string Str);
 public slots:
   void DB_Open();
   void SqliteOpen(QString whichDB);

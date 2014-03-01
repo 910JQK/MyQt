@@ -26,6 +26,61 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+  //Handle the arguments
+  QString DB_Type = "QSQLITE";
+  QString sqliteFile;
+  QString sqlHost;
+  int sqlPort = 3306;
+  QString sqlUser;
+  QString sqlPasswd;
+  QString sqlDB;
+  QStringListIterator args(QApplication::arguments());
+  int ac = QApplication::arguments().count();
+  if(ac > 1){
+    args.next(); //GoToPos 0
+    while(args.hasNext()){ //Read 1 by 1
+      const QString &a = args.next();
+      bool optsEnd = false;
+      //SQLite3DBFile
+      if(!args.hasNext() && DB_Type=="QSQLITE"){
+	sqliteFile = a;
+      }
+      if(a == "--"){ //End of options
+	optsEnd = true;
+      }
+      if(optsEnd == false){
+	if(a == "--help" || a == "-h"){
+	  OutputHelp();
+	}
+	else if(a == "--mysql" || a == "-m"){
+	  DB_Type = "QMYSQL";
+	}
+	else if(a == "--host" || a == "-h"){
+	  if(args.hasNext()){
+	    sqlHost = args.next();
+	  }
+	}
+	else if(a == "--port" || a == "-p"){
+	  if(args.hasNext()){
+	    sqlPort = args.next().toInt();
+	  }
+	}
+	else if(a == "--user" || a == "-u"){
+	  if(args.hasNext()){
+	    sqlUser = args.next();
+	  }
+	}
+	else if(a == "--database" || a == "-d"){
+	  if(args.hasNext()){
+	    sqlDB = args.next();
+	  }
+	}
+      }
+    }
+  }
+  //---------------
+
+
   //臨時性代碼
   QIcon::setThemeName("oxygen");
 
@@ -101,86 +156,63 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   QDesktopWidget *desktop = QApplication::desktop();
   move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
 
-  //Handle the arguments
-  QString DB_Type = "QSQLITE";
-  QString sqlHost;
-  int sqlPort = 3306;
-  QString sqlUser;
-  QString sqlPasswd;
-  QString sqlDB;
-  QStringListIterator args(QApplication::arguments());
-  int ac = QApplication::arguments().count();
-  if(ac > 1){
-    args.next(); //GoToPos 0
-    while(args.hasNext()){ //Read 1 by 1
-      const QString &a = args.next();
-      bool optsEnd = false;
-      //SQLite3DBFile
-      if(!args.hasNext() && DB_Type=="QSQLITE"){
-	SqliteOpen(a);
-      }
-      if(a == "--"){ //End of options
-	optsEnd = true;
-      }
-      if(optsEnd == false){
-	if(a == "--mysql" || a == "-m"){
-	  DB_Type = "QMYSQL";
-	}
-	else if(a == "--host" || a == "-h"){
-	  if(args.hasNext()){
-	    sqlHost = args.next();
-	  }
-	}
-	else if(a == "--port" || a == "-p"){
-	  if(args.hasNext()){
-	    sqlPort = args.next().toInt();
-	  }
-	}
-	else if(a == "--user" || a == "-u"){
-	  if(args.hasNext()){
-	    sqlUser = args.next();
-	  }
-	}
-	else if(a == "--database" || a == "-d"){
-	  if(args.hasNext()){
-	    sqlDB = args.next();
-	  }
-	}
-      }
+  // Open the database in arguments
+  if(DB_Type == "QMYSQL"){
+    //CheckEnough
+    if(sqlHost.isEmpty() || sqlUser.isEmpty() || sqlDB.isEmpty()){
+      qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
     }
-    if(DB_Type == "QMYSQL"){
-      //CheckEnough
-      if(sqlHost.isEmpty() || sqlUser.isEmpty() || sqlDB.isEmpty()){
-	qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
-      }
-
-      //GetPassword
-      qDebug().nospace()<<tr("Password:");
-      //HideInput
-      termios oldt;
-      tcgetattr(STDIN_FILENO, &oldt);
-      termios newt = oldt;
-      newt.c_lflag &= ~ECHO;
-      tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-      //Get
-      std::string s;
-      getline(std::cin, s);
-      sqlPasswd = QString::fromStdString(s); 
-      s="";
-      //Reset
-      newt.c_lflag |= ECHO;
-      tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-      
-      //Open
-      MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
-      sqlPasswd="";
-    }
+    
+    //GetPassword
+    std::cout<<tr("Password:").toStdString();
+    std::cout<<std::endl;
+    //HideInput
+    termios oldt;
+    tcgetattr(STDIN_FILENO, &oldt);
+    termios newt = oldt;
+    newt.c_lflag &= ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    //Get
+    std::string s;
+    getline(std::cin, s);
+    sqlPasswd = QString::fromStdString(s); 
+    s="";
+    //Reset
+    newt.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    
+    //Open
+    MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
+    sqlPasswd="";
+  }else if(!sqliteFile.isEmpty()){
+    SqliteOpen(sqliteFile);
   }
 }
 
 
 MainWindow::~MainWindow(){
 
+}
+
+
+void MainWindow::OutputHelp(){
+  using namespace std;
+  cout << "usage: Sqlbrowser [--help|-h] [--mysql|-m] [--port|-p " << stdTr("PORT") << "] [--host|-h " << stdTr("HOST") << "] [--user|-u " << stdTr("USERNAME") << "] [--database|-d " << stdTr("DBNAME") << "] [" << stdTr("DBFILE") << "]" << endl << endl;
+  cout << stdTr("optional arguments:") << endl;
+  cout << "  " << stdTr("DBFILE") << endl << "     " << stdTr("Sqlite3 database file to be opened") << endl << endl;
+  cout << "  -h, --help" << endl << "       " << stdTr("Show this help message and exit") << endl << endl;
+  cout << "  -m, --mysql" << endl << "       " << stdTr("Specify database type : Mysql") << endl << endl;
+  cout << "  -p " << stdTr("PORT") << ", --port " << stdTr("PORT") << endl << "       " << stdTr("Port of Mysql connection, 3306 for default") << endl << endl;
+  cout << "  -h " << stdTr("HOST") << ", --host " << stdTr("HOST") << endl << "       " << stdTr("Host of Mysql connection") << endl << endl;
+  cout << "  -u " << stdTr("USERNAME") << ", --user " << stdTr("USERNAME") << endl << "       " << stdTr("Username of Mysql connection") << endl << endl;
+  cout << "  -d " << stdTr("DBNAME") << ", --database " << stdTr("DBNAME") << endl << "       " << stdTr("Database of Mysql connection");
+
+  cout << endl;
+}
+
+
+std::string MainWindow::stdTr(std::string Str){
+  return QT_TR_NOOP(Str);
 }
 
 
