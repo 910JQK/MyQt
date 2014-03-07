@@ -26,61 +26,6 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
-  //Handle the arguments
-  QString DB_Type = "QSQLITE";
-  QString sqliteFile;
-  QString sqlHost;
-  int sqlPort = 3306;
-  QString sqlUser;
-  QString sqlPasswd;
-  QString sqlDB;
-  QStringListIterator args(QApplication::arguments());
-  int ac = QApplication::arguments().count();
-  if(ac > 1){
-    args.next(); //GoToPos 0
-    while(args.hasNext()){ //Read 1 by 1
-      const QString &a = args.next();
-      bool optsEnd = false;
-      //SQLite3DBFile
-      if(!args.hasNext() && DB_Type=="QSQLITE"){
-	sqliteFile = a;
-      }
-      if(a == "--"){ //End of options
-	optsEnd = true;
-      }
-      if(optsEnd == false){
-	if(a == "--help" || a == "-h"){
-	  OutputHelp();
-	}
-	else if(a == "--mysql" || a == "-m"){
-	  DB_Type = "QMYSQL";
-	}
-	else if(a == "--host" || a == "-h"){
-	  if(args.hasNext()){
-	    sqlHost = args.next();
-	  }
-	}
-	else if(a == "--port" || a == "-p"){
-	  if(args.hasNext()){
-	    sqlPort = args.next().toInt();
-	  }
-	}
-	else if(a == "--user" || a == "-u"){
-	  if(args.hasNext()){
-	    sqlUser = args.next();
-	  }
-	}
-	else if(a == "--database" || a == "-d"){
-	  if(args.hasNext()){
-	    sqlDB = args.next();
-	  }
-	}
-      }
-    }
-  }
-  //---------------
-
-
   //臨時性代碼
   QIcon::setThemeName("oxygen");
 
@@ -155,14 +100,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   resize(720,400);
   QDesktopWidget *desktop = QApplication::desktop();
   move((desktop->width() - this->width())/2, (desktop->height() - this->height())/2);
+}
 
-  // Open the database in arguments
-  if(DB_Type == "QMYSQL"){
-    //CheckEnough
-    if(sqlHost.isEmpty() || sqlUser.isEmpty() || sqlDB.isEmpty()){
-      qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
-    }
-    
+
+MainWindow::~MainWindow(){
+
+}
+
+
+void MainWindow::openMysqlByArgs(QStringList dataField){
+  // Open the mysql database in arguments
+  sqlHost = dataField[0];
+  sqlPort = dataField[1].toInt();
+  sqlUser = dataField[2];
+  sqlDB = dataField[3];
+  
     //GetPassword
     std::cout<<tr("Password:").toStdString();
     std::cout<<std::endl;
@@ -184,14 +136,96 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     //Open
     MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
     sqlPasswd="";
-  }else if(!sqliteFile.isEmpty()){
-    SqliteOpen(sqliteFile);
-  }
 }
 
 
-MainWindow::~MainWindow(){
-
+void MainWindow::handleArgs(QList<MainWindow*> *W_List){
+  //Handle the arguments
+  QString _DB_Type = "QSQLITE";
+  QStringList sFileList; 
+  QString _sqlHost; //0
+  int _sqlPort = 3306; //1
+  QString _sqlUser; //2
+  QString _sqlDB; //3
+  QStringListIterator args(QApplication::arguments());
+  int ac = QApplication::arguments().count();
+  if(ac > 1){
+    args.next(); //GoToPos 0
+    while(args.hasNext()){ //Read 1 by 1
+      const QString &a = args.next();
+      bool optsEnd = false;
+      if(a == "--"){ //End of options
+	optsEnd = true;
+      }
+      if(optsEnd == false){
+	if(a == "--help" || a == "-h"){
+	  OutputHelp();
+	}
+	else if(a == "--mysql" || a == "-m"){
+	  _DB_Type = "QMYSQL";
+	}
+	else if(a == "--host" || a == "-h"){
+	  if(args.hasNext()){
+	    _sqlHost = args.next();
+	  }
+	}
+	else if(a == "--port" || a == "-p"){
+	  if(args.hasNext()){
+	    _sqlPort = args.next().toInt();
+	  }
+	}
+	else if(a == "--user" || a == "-u"){
+	  if(args.hasNext()){
+	    _sqlUser = args.next();
+	  }
+	}
+	else if(a == "--database" || a == "-d"){
+	  if(args.hasNext()){
+	    _sqlDB = args.next();
+	  }
+	}
+	else if(_DB_Type=="QSQLITE"){ 	//SQLite3DBFile
+	  sFileList << a;
+	}
+      }
+      else if(_DB_Type=="QSQLITE"){ 	//SQLite3DBFile
+	sFileList << a;
+      }
+    }
+  }
+  if(_DB_Type == "QMYSQL"){
+    //CheckEnough
+    if(_sqlHost.isEmpty() || _sqlUser.isEmpty() || _sqlDB.isEmpty()){
+      qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
+    }else{
+      MainWindow *window;
+      window = new MainWindow();
+      window -> DB_Type = _DB_Type;
+      window -> openMysqlByArgs( QStringList() << _sqlHost << QString::number(_sqlPort) << _sqlUser << _sqlDB );
+      window -> show();
+      W_List -> append(window);
+    }
+  }else{
+    if(sFileList.count() != 0){
+      foreach(QString currentFile, sFileList){
+	MainWindow *window;
+	window = new MainWindow();
+	qDebug() << "Memory alloced";
+	window -> DB_Type = _DB_Type;
+	window -> SqliteOpen(currentFile);
+	window -> show();
+	W_List -> append(window);
+      }
+    }else{
+      MainWindow *window;
+      window = new MainWindow();
+      qDebug() << "Memory alloced";
+      window -> DB_Type = _DB_Type;
+      window -> show();
+      W_List -> append(window);
+    }
+  }
+  //---------------
 }
 
 

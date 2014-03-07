@@ -1,22 +1,21 @@
 #include <QApplication>
+#include <QList>
 #include "sqlbrowser.h"
 #include "../translate.h"
 
 int main(int argc, char *argv[]){
-  QApplication a(argc,argv);
-
-  if(a.arguments().length() > 1){
-    if(a.arguments()[1] == "--help" || a.arguments()[1] == "-h"){
+  if(argc > 1){
+    if(strcmp(argv[1],"--help") == 0){
       MainWindow::OutputHelp();
-      a.quit();
       return 0;
     }
   }
-  TR appTR(&a,"sqlbrowser_","locale");
 
-  MainWindow *W;
-  W = new MainWindow;
-  W -> show();
+  QApplication a(argc,argv);
+  TR appTR(&a,"sqlbrowser_","locale");
+  
+  QList<MainWindow*> W;
+  MainWindow::handleArgs(&W);
 
   return a.exec();
 }

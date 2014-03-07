@@ -24,9 +24,18 @@ class MainWindow : public QMainWindow {
 public:
   MainWindow(QWidget *parent = 0);
   ~MainWindow();
+  static void handleArgs(QList<MainWindow*> *W_List);
   static void OutputHelp();
   static std::string stdTr(std::string Str);
+  QString DB_Type;
+  QString sqliteFile;
+  QString sqlHost;
+  int sqlPort;
+  QString sqlUser;
+  QString sqlPasswd;
+  QString sqlDB;
 public slots:
+  void openMysqlByArgs(QStringList dataField);
   void DB_Open();
   void SqliteOpen(QString whichDB);
   void MySqlOpen(QString host, int port, QString user, QString passwd, QString dbName);

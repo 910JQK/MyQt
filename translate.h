@@ -1,3 +1,5 @@
+#ifndef MYQT_TRANSLATE_H_
+#define MYQT_TRANSLATE_H_
 #include <QObject>
 class QApplication;
 class QTranslator;
@@ -21,3 +23,4 @@ public slots:
   void ChangeLocale(QString CurrentLocale);
 };
 
+#endif //MYQT_TRANSLATE_H_
