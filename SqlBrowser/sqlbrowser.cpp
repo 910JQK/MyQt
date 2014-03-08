@@ -96,6 +96,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
   dock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
   addDockWidget(Qt::BottomDockWidgetArea, dock);
 
+  //Title
+  setWindowTitle(tr("Sqlbrowser"));
+
   //Size and Position
   resize(720,400);
   QDesktopWidget *desktop = QApplication::desktop();
@@ -107,46 +110,17 @@ MainWindow::~MainWindow(){
 
 }
 
-
-void MainWindow::openMysqlByArgs(QStringList dataField){
-  // Open the mysql database in arguments
-  sqlHost = dataField[0];
-  sqlPort = dataField[1].toInt();
-  sqlUser = dataField[2];
-  sqlDB = dataField[3];
-  
-    //GetPassword
-    std::cout<<tr("Password:").toStdString();
-    std::cout<<std::endl;
-    //HideInput
-    termios oldt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    termios newt = oldt;
-    newt.c_lflag &= ~ECHO;
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    //Get
-    std::string s;
-    getline(std::cin, s);
-    sqlPasswd = QString::fromStdString(s); 
-    s="";
-    //Reset
-    newt.c_lflag |= ECHO;
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    
-    //Open
-    MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
-    sqlPasswd="";
-}
+//BEGIN:static { 
 
 
 void MainWindow::handleArgs(QList<MainWindow*> *W_List){
   //Handle the arguments
   QString _DB_Type = "QSQLITE";
   QStringList sFileList; 
-  QString _sqlHost; //0
-  int _sqlPort = 3306; //1
-  QString _sqlUser; //2
-  QString _sqlDB; //3
+  QString _sqlHost; //dataField[0]
+  int _sqlPort = 3306; //[1]
+  QString _sqlUser; //[2]
+  QString _sqlDB; //[3]
   QStringListIterator args(QApplication::arguments());
   int ac = QApplication::arguments().count();
   if(ac > 1){
@@ -158,7 +132,7 @@ void MainWindow::handleArgs(QList<MainWindow*> *W_List){
 	optsEnd = true;
       }
       if(optsEnd == false){
-	if(a == "--help" || a == "-h"){
+	if(a == "--help"){
 	  OutputHelp();
 	}
 	else if(a == "--mysql" || a == "-m"){
@@ -197,7 +171,13 @@ void MainWindow::handleArgs(QList<MainWindow*> *W_List){
     //CheckEnough
     if(_sqlHost.isEmpty() || _sqlUser.isEmpty() || _sqlDB.isEmpty()){
       qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
+      MainWindow *window;
+      window = new MainWindow();
+      qDebug() << "Memory allocated";
+      window -> show();
+      W_List -> append(window);      
     }else{
+      //Mysql
       MainWindow *window;
       window = new MainWindow();
       window -> DB_Type = _DB_Type;
@@ -207,19 +187,21 @@ void MainWindow::handleArgs(QList<MainWindow*> *W_List){
     }
   }else{
     if(sFileList.count() != 0){
+      // MultiDB or 1 from args
       foreach(QString currentFile, sFileList){
 	MainWindow *window;
 	window = new MainWindow();
-	qDebug() << "Memory alloced";
+	qDebug() << "Memory allocated";
 	window -> DB_Type = _DB_Type;
 	window -> SqliteOpen(currentFile);
 	window -> show();
 	W_List -> append(window);
       }
     }else{
+      //Non-preopen
       MainWindow *window;
       window = new MainWindow();
-      qDebug() << "Memory alloced";
+      qDebug() << "Memory allocated";
       window -> DB_Type = _DB_Type;
       window -> show();
       W_List -> append(window);
@@ -231,22 +213,51 @@ void MainWindow::handleArgs(QList<MainWindow*> *W_List){
 
 void MainWindow::OutputHelp(){
   using namespace std;
-  cout << "usage: Sqlbrowser [--help|-h] [--mysql|-m] [--port|-p " << stdTr("PORT") << "] [--host|-h " << stdTr("HOST") << "] [--user|-u " << stdTr("USERNAME") << "] [--database|-d " << stdTr("DBNAME") << "] [" << stdTr("DBFILE") << "]" << endl << endl;
-  cout << stdTr("optional arguments:") << endl;
-  cout << "  " << stdTr("DBFILE") << endl << "     " << stdTr("Sqlite3 database file to be opened") << endl << endl;
-  cout << "  -h, --help" << endl << "       " << stdTr("Show this help message and exit") << endl << endl;
-  cout << "  -m, --mysql" << endl << "       " << stdTr("Specify database type : Mysql") << endl << endl;
-  cout << "  -p " << stdTr("PORT") << ", --port " << stdTr("PORT") << endl << "       " << stdTr("Port of Mysql connection, 3306 for default") << endl << endl;
-  cout << "  -h " << stdTr("HOST") << ", --host " << stdTr("HOST") << endl << "       " << stdTr("Host of Mysql connection") << endl << endl;
-  cout << "  -u " << stdTr("USERNAME") << ", --user " << stdTr("USERNAME") << endl << "       " << stdTr("Username of Mysql connection") << endl << endl;
-  cout << "  -d " << stdTr("DBNAME") << ", --database " << stdTr("DBNAME") << endl << "       " << stdTr("Database of Mysql connection");
+  cout << "usage: Sqlbrowser [--help|-h] [--mysql|-m] [--port|-p " << QT_TR_NOOP("PORT") << "] [--host|-h " << QT_TR_NOOP("HOST") << "] [--user|-u " << QT_TR_NOOP("USERNAME") << "] [--database|-d " << QT_TR_NOOP("DBNAME") << "] [" << QT_TR_NOOP("DBFILE") << "]" << endl << endl;
+  cout << QT_TR_NOOP("optional arguments:") << endl;
+  cout << "  " << QT_TR_NOOP("DBFILE") << endl << "     " << QT_TR_NOOP("Sqlite3 database file to be opened") << endl << endl;
+  cout << "  -h, --help" << endl << "       " << QT_TR_NOOP("Show this help message and exit") << endl << endl;
+  cout << "  -m, --mysql" << endl << "       " << QT_TR_NOOP("Specify database type : Mysql") << endl << endl;
+  cout << "  -p " << QT_TR_NOOP("PORT") << ", --port " << QT_TR_NOOP("PORT") << endl << "       " << QT_TR_NOOP("Port of Mysql connection, 3306 for default") << endl << endl;
+  cout << "  -h " << QT_TR_NOOP("HOST") << ", --host " << QT_TR_NOOP("HOST") << endl << "       " << QT_TR_NOOP("Host of Mysql connection") << endl << endl;
+  cout << "  -u " << QT_TR_NOOP("USERNAME") << ", --user " << QT_TR_NOOP("USERNAME") << endl << "       " << QT_TR_NOOP("Username of Mysql connection") << endl << endl;
+  cout << "  -d " << QT_TR_NOOP("DBNAME") << ", --database " << QT_TR_NOOP("DBNAME") << endl << "       " << QT_TR_NOOP("Database of Mysql connection");
 
   cout << endl;
 }
 
 
-std::string MainWindow::stdTr(std::string Str){
-  return QT_TR_NOOP(Str);
+//}END:static 
+
+
+void MainWindow::openMysqlByArgs(QStringList dataField){
+  // Open the mysql database in arguments
+  sqlHost = dataField[0];
+  sqlPort = dataField[1].toInt();
+  sqlUser = dataField[2];
+  sqlDB = dataField[3];
+  
+    //GetPassword
+    std::cout<<tr("Password:").toStdString();
+    //HideInput
+    termios oldt;
+    tcgetattr(STDIN_FILENO, &oldt);
+    termios newt = oldt;
+    newt.c_lflag &= ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    //Get
+    std::string s;
+    getline(std::cin, s);
+    sqlPasswd = QString::fromStdString(s); 
+    s="";
+    //Reset
+    newt.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    std::cout << std::endl;
+    
+    //Open
+    MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
+    sqlPasswd="";
 }
 
 
@@ -270,6 +281,7 @@ void MainWindow::SqliteOpen(QString whichDB){
     tableListModel -> setStringList(DB.tables());
     queryEdit -> setEnabled(true);
     DBNAME=whichDB;
+    setWindowTitle(tr("Sqlbrowser")+" - "+DBNAME);
   }else{
     qDebug() << "Error:Cannot open database " + whichDB + " - " + DB.lastError().text();
     queryEdit -> setEnabled(false);
@@ -287,9 +299,18 @@ void MainWindow::MySqlOpen(QString host, int port, QString user, QString passwd,
   DB.setPassword(passwd);
   DB.setDatabaseName(dbName);
   if(DB.open()){
+    //Databases
+    QSqlQuery get_list(DB);
+    get_list.exec("show databases");
+    std::cout << "List of databases:" << std::endl ;
+    while(get_list.next())
+      std::cout << get_list.value(0).toString().toStdString() << std::endl ;
+    get_list.clear();
+    //Tables
     tableListModel -> setStringList(DB.tables());
     queryEdit -> setEnabled(true);
     DBNAME=dbName;
+    setWindowTitle(tr("Sqlbrowser")+" - "+host+"_"+DBNAME);
   }else{
     qDebug() << "Error:Cannot open database " + dbName + " - " + DB.lastError().text();
     queryEdit -> setEnabled(false);
@@ -530,6 +551,7 @@ void MainWindow::do_query(){
   QString queryStr = queryEdit->text();
   if(!Query.exec(queryStr) ){
     qDebug()<<"Error while executing SQL command";
+    qDebug()<<Query.lastError().text();
   }else{
     qDebug()<< Query.numRowsAffected() << "Row(s) affected";
     dock -> setWindowTitle(tr("SqlQuery : %n row(s) affected.", 0, Query.numRowsAffected() ));
