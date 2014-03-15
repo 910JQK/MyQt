@@ -238,7 +238,7 @@ void MainWindow::openMysqlByArgs(QStringList dataField){
   sqlDB = dataField[3];
   
     //GetPassword
-    std::cout<<tr("Password:").toStdString();
+    std::wcout<<tr("Password:").toStdWString();
     //HideInput
     termios oldt;
     tcgetattr(STDIN_FILENO, &oldt);
@@ -253,7 +253,7 @@ void MainWindow::openMysqlByArgs(QStringList dataField){
     //Reset
     newt.c_lflag |= ECHO;
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    std::cout << std::endl;
+    std::wcout << std::endl;
     
     if(!sqlDB.isEmpty()){
       //Open

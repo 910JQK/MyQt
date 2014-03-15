@@ -17,7 +17,6 @@ class QLineEdit;
 class QAction;
 class QSqlQuery;
 class QSqlQueryModel;
-class QApplication;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -26,7 +25,6 @@ public:
   ~MainWindow();
   static void handleArgs(QList<MainWindow*> *W_List);
   static void OutputHelp();
-  static std::string stdTr(std::string Str);
   QString DB_Type;
   QString sqliteFile;
   QString sqlHost;
