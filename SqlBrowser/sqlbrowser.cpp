@@ -169,7 +169,7 @@ void MainWindow::handleArgs(QList<MainWindow*> *W_List){
   }
   if(_DB_Type == "QMYSQL"){
     //CheckEnough
-    if(_sqlHost.isEmpty() || _sqlUser.isEmpty() || _sqlDB.isEmpty()){
+    if(_sqlHost.isEmpty() || _sqlUser.isEmpty() ){
       qDebug()<<tr("Error:Not enough arguments to open the Mysql database");
       MainWindow *window;
       window = new MainWindow();
@@ -255,8 +255,36 @@ void MainWindow::openMysqlByArgs(QStringList dataField){
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     std::cout << std::endl;
     
-    //Open
-    MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
+    if(!sqlDB.isEmpty()){
+      //Open
+      MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,sqlDB);
+    }else{ 
+      /* Take a temp database and get databases */
+      QSqlDatabase TempDB = QSqlDatabase::addDatabase("QMYSQL");
+      TempDB.setHostName(sqlHost);
+      TempDB.setPort(sqlPort);
+      TempDB.setUserName(sqlUser);
+      TempDB.setPassword(sqlPasswd);
+      if(TempDB.open()){
+	QSqlQuery get_list(TempDB);
+	get_list.exec("show databases");
+	std::cout << "List of databases:" << std::endl ;
+	while(get_list.next())
+	  std::cout << get_list.value(0).toString().toStdString() << std::endl ;
+	get_list.clear();
+	TempDB.close();
+	TempDB = QSqlDatabase();
+	TempDB.removeDatabase("qt_sql_default_connection");
+	/* Select database by input */
+	std::string userSelectedDB;
+	std::cout << "Select:";
+	std::cin >> userSelectedDB;
+	std::cout << std::endl;
+	MySqlOpen(sqlHost,sqlPort,sqlUser,sqlPasswd,QString::fromStdString(userSelectedDB));
+      }else{
+	qDebug() << "Error:Cannot open database  - " + DB.lastError().text();
+      }
+    }
     sqlPasswd="";
 }
 
@@ -299,13 +327,6 @@ void MainWindow::MySqlOpen(QString host, int port, QString user, QString passwd,
   DB.setPassword(passwd);
   DB.setDatabaseName(dbName);
   if(DB.open()){
-    //Databases
-    QSqlQuery get_list(DB);
-    get_list.exec("show databases");
-    std::cout << "List of databases:" << std::endl ;
-    while(get_list.next())
-      std::cout << get_list.value(0).toString().toStdString() << std::endl ;
-    get_list.clear();
     //Tables
     tableListModel -> setStringList(DB.tables());
     queryEdit -> setEnabled(true);
@@ -335,7 +356,13 @@ void MainWindow::OpenClear(){
     tabType<<1;
     OpenedTableList.clear();
     DB.close();
-    DB.removeDatabase(DBNAME);
+    DB = QSqlDatabase();
+    /* Special handle for Mysql */
+    if(QSqlDatabase::contains(DBNAME)){
+      DB.removeDatabase(DBNAME);
+    }else{
+      DB.removeDatabase("qt_sql_default_connection");
+    }
     qDebug()<<"Cleaning";
     ListDebugging();
   }
